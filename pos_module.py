@@ -1,262 +1,353 @@
+import winsound
+import tkinter as tk
+from tkinter import messagebox
 import customtkinter as ctk
-from tkinter import ttk, messagebox
-import sqlite3
-from rt_driver import RegistratoreTelematico
+import database
+from datetime import datetime
 
-class ModuloPOS(ctk.CTkFrame):
-    def __init__(self, parent, db_manager):
-        super().__init__(parent, fg_color="transparent")
-        self.db = db_manager
-        self.rt = RegistratoreTelematico()
-        self.cart_items = []
-        self.tastierino_buffer = ""
+class POSModule(ctk.CTkFrame):
+    def __init__(self, parent, app_instance=None):
+        super().__init__(parent)
+        self.app_instance = app_instance
 
+        # Stato della cassa e carrello
+        self.carrello = []
+        self.quantita_moltiplicatore = 1.0
+        self.cliente_selezionato = None
+        self.importo_tastierino = ""
+
+        # Layout principale POS: 2 colonne (Sinistra: Carrello/LCD, Destra: Tastierino/Reparti/Azioni)
+        self.grid_columnconfigure(0, weight=6)
+        self.grid_columnconfigure(1, weight=4)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=3)
-        self.grid_columnconfigure(1, weight=2)
 
-        self.left_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        self.left_frame.grid_rowconfigure(3, weight=1)
-        self.left_frame.grid_columnconfigure(0, weight=1)
+        self._crea_colonna_sinistra()
+        self._crea_colonna_destra()
+        self.carica_reparti()
 
-        self.barcode_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")
-        self.barcode_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 8))
-        self.barcode_frame.grid_columnconfigure(0, weight=1)
+    def play_beep(self):
+        """Emette un suono acustico di conferma scansione/battuta."""
+        try:
+            winsound.Beep(1800, 80)
+        except Exception:
+            pass
 
-        self.entry_barcode = ctk.CTkEntry(self.barcode_frame, placeholder_text="Scansiona EAN o digita codice e premi Invio...", height=38, font=ctk.CTkFont(size=13))
-        self.entry_barcode.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        self.entry_barcode.bind("<Return>", self.cerca_e_aggiungi_da_ean)
-        self.entry_barcode.focus()
+    # -------------------------------------------------------------------------
+    # COLONNA SINISTRA: Display LCD + Tabella Carrello + Input Barcode
+    # -------------------------------------------------------------------------
+    def _crea_colonna_sinistra(self):
+        frame_sx = ctk.CTkFrame(self, fg_color="transparent")
+        frame_sx.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        frame_sx.grid_columnconfigure(0, weight=1)
+        frame_sx.grid_rowconfigure(2, weight=1)
 
-        self.btn_cerca_art = ctk.CTkButton(self.barcode_frame, text="🔍 Cerca", width=80, height=38, fg_color="#2980b9", command=self.apri_finestra_ricerca_articoli)
-        self.btn_cerca_art.grid(row=0, column=1, sticky="e")
+        # 1. Display LCD
+        self.frame_lcd = ctk.CTkFrame(frame_sx, fg_color="#0d2818", corner_radius=10, height=110)
+        self.frame_lcd.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        self.frame_lcd.grid_columnconfigure(0, weight=1)
 
-        self.display_frame = ctk.CTkFrame(self.left_frame, fg_color="#000000", corner_radius=6, height=85)
-        self.display_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 8))
-        self.display_frame.pack_propagate(False)
+        self.lbl_lcd_articolo = ctk.CTkLabel(
+            self.frame_lcd, text="PRONTO ALLA VENDITA",
+            font=ctk.CTkFont(family="Consolas", size=16, weight="bold"),
+            text_color="#2ec4b6", anchor="w"
+        )
+        self.lbl_lcd_articolo.grid(row=0, column=0, sticky="w", padx=15, pady=(10, 0))
 
-        self.lbl_articolo_selezionato = ctk.CTkLabel(self.display_frame, text="Pronto alla vendita...", text_color="#2ecc71", font=ctk.CTkFont(size=14, weight="bold"))
-        self.lbl_articolo_selezionato.pack(anchor="w", padx=12, pady=(6, 0))
+        self.lbl_lcd_totale = ctk.CTkLabel(
+            self.frame_lcd, text="€ 0.00",
+            font=ctk.CTkFont(family="Consolas", size=38, weight="bold"),
+            text_color="#80ed99", anchor="e"
+        )
+        self.lbl_lcd_totale.grid(row=1, column=0, sticky="e", padx=15, pady=(0, 10))
 
-        self.lbl_totale_grande = ctk.CTkLabel(self.display_frame, text="€ 0,00", text_color="#2ecc71", font=ctk.CTkFont(size=30, weight="bold"))
-        self.lbl_totale_grande.pack(anchor="e", padx=12, pady=(0, 6))
+        # 2. Input Barcode e Ricerca Veloce
+        frame_input = ctk.CTkFrame(frame_sx)
+        frame_input.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        frame_input.grid_columnconfigure(1, weight=1)
 
-        self.table_frame = ctk.CTkFrame(self.left_frame)
-        self.table_frame.grid(row=3, column=0, sticky="nsew", padx=0, pady=(0, 8))
-        self.table_frame.grid_rowconfigure(0, weight=1)
-        self.table_frame.grid_columnconfigure(0, weight=1)
+        lbl_bc = ctk.CTkLabel(frame_input, text="Barcode / Codice:", font=ctk.CTkFont(weight="bold"))
+        lbl_bc.grid(row=0, column=0, padx=10, pady=8)
 
-        cols_cart = ("Codice EAN", "Descrizione Articolo", "Q.tà", "Prezzo Unit.", "Totale")
-        self.tree_cart = ttk.Treeview(self.table_frame, columns=cols_cart, show="headings")
-        self.tree_cart.heading("Codice EAN", text="EAN")
-        self.tree_cart.heading("Descrizione Articolo", text="Descrizione Articolo")
-        self.tree_cart.heading("Q.tà", text="Q.tà")
-        self.tree_cart.heading("Prezzo Unit.", text="Prezzo Unit.")
-        self.tree_cart.heading("Totale", text="Totale")
-        
-        self.tree_cart.column("Codice EAN", width=100, anchor="w")
-        self.tree_cart.column("Descrizione Articolo", width=170, anchor="w")
-        self.tree_cart.column("Q.tà", width=45, anchor="center")
-        self.tree_cart.column("Prezzo Unit.", width=80, anchor="e")
-        self.tree_cart.column("Totale", width=80, anchor="e")
-        self.tree_cart.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.entry_barcode = ctk.CTkEntry(frame_input, placeholder_text="Scansiona EAN o digita codice...")
+        self.entry_barcode.grid(row=0, column=1, sticky="ew", padx=5, pady=8)
+        self.entry_barcode.bind("<Return>", self.cerca_e_aggiungi_articolo)
 
-        self.summary_frame = ctk.CTkFrame(self.left_frame, fg_color="#e0e0e0", height=38, corner_radius=4)
-        self.summary_frame.grid(row=4, column=0, sticky="ew")
-        self.summary_frame.pack_propagate(False)
+        btn_add = ctk.CTkButton(frame_input, text="Aggiungi", width=80, command=self.cerca_e_aggiungi_articolo)
+        btn_add.grid(row=0, column=2, padx=10, pady=8)
 
-        self.lbl_voci_conteggio = ctk.CTkLabel(self.summary_frame, text="0 voci", text_color="#333333", font=ctk.CTkFont(size=13, weight="bold"))
-        self.lbl_voci_conteggio.pack(side="left", padx=15)
+        # 3. Tabella / Lista Carrello
+        self.scroll_carrello = ctk.CTkScrollableFrame(frame_sx, label_text="Articoli in Scontrino")
+        self.scroll_carrello.grid(row=2, column=0, sticky="nsew")
+        self.scroll_carrello.grid_columnconfigure(1, weight=1)
 
-        self.lbl_voci_totale = ctk.CTkLabel(self.summary_frame, text="€ 0,00", text_color="#333333", font=ctk.CTkFont(size=13, weight="bold"))
-        self.lbl_voci_totale.pack(side="right", padx=15)
+    # -------------------------------------------------------------------------
+    # COLONNA DESTRA: Tastierino Numerico + Reparti + Pagamento
+    # -------------------------------------------------------------------------
+    def _crea_colonna_destra(self):
+        frame_dx = ctk.CTkFrame(self)
+        frame_dx.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        frame_dx.grid_columnconfigure((0, 1, 2), weight=1)
 
-        self.right_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
-        
-        for i in range(5):
-            self.right_frame.grid_columnconfigure(i, weight=1, uniform="col")
-        for i in range(8):
-            self.right_frame.grid_rowconfigure(i, weight=1, uniform="row")
+        # --- Display Tastierino Digitale ---
+        self.lbl_disp_tastierino = ctk.CTkLabel(
+            frame_dx, text="Importo: € 0.00",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            fg_color=("#e0e0e0", "#2b2b2b"), corner_radius=6, height=40
+        )
+        self.lbl_disp_tastierino.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 5))
 
-        btn_style = {"font": ctk.CTkFont(size=15, weight="bold"), "corner_radius": 4}
+        # --- Tastierino Numerico (0-9, ., 00, C) ---
+        tasti = [
+            ('7', 1, 0), ('8', 1, 1), ('9', 1, 2),
+            ('4', 2, 0), ('5', 2, 1), ('6', 2, 2),
+            ('1', 3, 0), ('2', 3, 1), ('3', 3, 2),
+            ('C', 4, 0), ('0', 4, 1), ('.', 4, 2)
+        ]
 
-        ctk.CTkButton(self.right_frame, text="€", fg_color="#e8d8f0", text_color="#6c3483", **btn_style, command=lambda: self.premi_tasto("€")).grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Q.tà", fg_color="#e8d8f0", text_color="#6c3483", **btn_style, command=lambda: self.premi_tasto("Q.tà")).grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="-%", fg_color="#e8d8f0", text_color="#6c3483", **btn_style, command=lambda: self.premi_tasto("-%")).grid(row=0, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Elim", fg_color="#e8d8f0", text_color="#6c3483", **btn_style, command=self.rimuovi_articolo).grid(row=0, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="▼", fg_color="#e0e0e0", text_color="#333333", **btn_style, command=lambda: self.premi_tasto("▼")).grid(row=0, column=4, sticky="nsew", padx=2, pady=2)
+        for (testo, riga, col) in tasti:
+            cmd = lambda t=testo: self._pressione_tastierino(t)
+            colore = "#a83232" if testo == 'C' else None
+            btn = ctk.CTkButton(frame_dx, text=testo, font=ctk.CTkFont(size=16, weight="bold"),
+                                fg_color=colore, height=45, command=cmd)
+            btn.grid(row=riga, column=col, sticky="nsew", padx=3, pady=3)
 
-        ctk.CTkButton(self.right_frame, text="CL", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=self.pulisci_buffer).grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="X", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=lambda: self.premi_tasto("X")).grid(row=1, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Reso", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=lambda: self.premi_tasto("Reso")).grid(row=1, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="-", fg_color="#e5e7e9", text_color="#5d6d7e", **btn_style).grid(row=1, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="-", fg_color="#e5e7e9", text_color="#5d6d7e", **btn_style).grid(row=1, column=4, sticky="nsew", padx=2, pady=2)
+        # --- Sezione Reparti Rapidi ---
+        lbl_rep = ctk.CTkLabel(frame_dx, text="Seleziona Reparto per Vendita Libera:", font=ctk.CTkFont(size=11, weight="bold"))
+        lbl_rep.grid(row=5, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 2))
 
-        ctk.CTkButton(self.right_frame, text="7", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("7")).grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="8", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("8")).grid(row=2, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="9", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("9")).grid(row=2, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="-", fg_color="#e5e7e9", text_color="#5d6d7e", **btn_style).grid(row=2, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Cart", fg_color="#fadbd8", text_color="#78281f", **btn_style, command=lambda: self.aggiungi_vendita_libera("Articolo Cartoleria")).grid(row=2, column=4, sticky="nsew", padx=2, pady=2)
+        self.frame_reparti = ctk.CTkFrame(frame_dx, fg_color="transparent")
+        self.frame_reparti.grid(row=6, column=0, columnspan=3, sticky="ew", padx=5)
+        self.frame_reparti.grid_columnconfigure((0, 1), weight=1)
 
-        ctk.CTkButton(self.right_frame, text="4", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("4")).grid(row=3, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="5", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("5")).grid(row=3, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="6", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("6")).grid(row=3, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="4", fg_color="#eaedf0", text_color="#196f3d", **btn_style, command=lambda: self.aggiungi_vendita_libera("Reparto 4")).grid(row=3, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Banc", fg_color="#fadbd8", text_color="#78281f", **btn_style, command=lambda: self.aggiungi_vendita_libera("Vendita Banco")).grid(row=3, column=4, sticky="nsew", padx=2, pady=2)
+        # --- Pulsanti Pagamento Veloce ---
+        btn_contanti = ctk.CTkButton(frame_dx, text="💵 CONTANTI (Calcolo Resto)", fg_color="#2e7d32", height=50,
+                                     font=ctk.CTkFont(size=15, weight="bold"), command=lambda: self.concludi_vendita("CONTANTI"))
+        btn_contanti.grid(row=7, column=0, columnspan=3, sticky="ew", padx=10, pady=(15, 5))
 
-        ctk.CTkButton(self.right_frame, text="1", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("1")).grid(row=4, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="2", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("2")).grid(row=4, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="3", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("3")).grid(row=4, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="10", fg_color="#eaedf0", text_color="#196f3d", **btn_style, command=lambda: self.aggiungi_vendita_libera("Reparto 10")).grid(row=4, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Non", fg_color="#fadbd8", text_color="#78281f", **btn_style, command=lambda: self.aggiungi_vendita_libera("Articolo Non Censito")).grid(row=4, column=4, sticky="nsew", padx=2, pady=2)
+        btn_pos = ctk.CTkButton(frame_dx, text="💳 POS / CARTA", fg_color="#1565c0", height=50,
+                                font=ctk.CTkFont(size=15, weight="bold"), command=lambda: self.concludi_vendita("POS"))
+        btn_pos.grid(row=8, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkButton(self.right_frame, text="0", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra("0")).grid(row=5, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text=",", fg_color="#eaeded", text_color="#2c3e50", **btn_style, command=lambda: self.aggiungi_cifra(",")).grid(row=5, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="22", fg_color="#eaedf0", text_color="#196f3d", **btn_style, command=lambda: self.aggiungi_vendita_libera("Reparto 22% IVA")).grid(row=5, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Cont", fg_color="#fadbd8", text_color="#78281f", **btn_style, command=lambda: self.completa_vendita("CONTANTI")).grid(row=5, column=4, sticky="nsew", padx=2, pady=2)
+        btn_annulla = ctk.CTkButton(frame_dx, text="❌ Annulla Scontrino", fg_color="#c62828", height=35,
+                                    command=self.svuota_carrello)
+        btn_annulla.grid(row=9, column=0, columnspan=3, sticky="ew", padx=10, pady=(5, 10))
 
-        ctk.CTkButton(self.right_frame, text="Nuov", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=self.nuovo_scontrino).grid(row=6, column=0, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Stam", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=lambda: self.completa_vendita("CONTANTI")).grid(row=6, column=1, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Ann!", fg_color="#f9e79f", text_color="#7d6608", **btn_style, command=self.nuovo_scontrino).grid(row=6, column=2, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Cod.", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=lambda: self.premi_tasto("Cod.")).grid(row=6, column=3, sticky="nsew", padx=2, pady=2)
-        ctk.CTkButton(self.right_frame, text="Subt", fg_color="#d4e6f1", text_color="#1b4f72", **btn_style, command=lambda: self.premi_tasto("Subt")).grid(row=6, column=4, sticky="nsew", padx=2, pady=2)
+    # -------------------------------------------------------------------------
+    # LOGICA TASTIERINO NUMERICO E REPARTI
+    # -------------------------------------------------------------------------
+    def _pressione_tastierino(self, valore):
+        """Gestisce l'immissione di numeri o del tasto Clear sul tastierino."""
+        if valore == 'C':
+            self.importo_tastierino = ""
+        elif valore == '.':
+            if '.' not in self.importo_tastierino:
+                self.importo_tastierino += '.' if self.importo_tastierino else '0.'
+        else:
+            self.importo_tastierino += valore
 
-    def cerca_e_aggiungi_da_ean(self, event):
-        ean = self.entry_barcode.get().strip()
-        self.entry_barcode.delete(0, "end")
-        if not ean:
+        txt = f"Importo: € {self.importo_tastierino}" if self.importo_tastierino else "Importo: € 0.00"
+        self.lbl_disp_tastierino.configure(text=txt)
+
+    def carica_reparti(self):
+        """Carica dinamicamente i reparti dal DB e crea i pulsanti di vendita libera."""
+        for w in self.frame_reparti.winfo_children():
+            w.destroy()
+
+        conn = database.get_db_connection()
+        reparti = conn.execute("SELECT * FROM reparti").fetchall()
+        conn.close()
+
+        r, c = 0, 0
+        for rep in reparti:
+            r_id = rep["id"]
+            r_nome = rep["nome_reparto"]
+            btn = ctk.CTkButton(
+                self.frame_reparti, text=r_nome, fg_color="#37474f", height=35,
+                command=lambda id_rep=r_id, nome_rep=r_nome: self.aggiungi_vendita_libera(id_rep, nome_rep)
+            )
+            btn.grid(row=r, column=c, sticky="ew", padx=3, pady=3)
+            c += 1
+            if c > 1:
+                c = 0
+                r += 1
+
+    def aggiungi_vendita_libera(self, reparto_id, nome_reparto):
+        """Aggiunge una voce libera a carrello basata sull'importo digitato sul tastierino."""
+        if not self.importo_tastierino:
+            messagebox.showwarning("Tastierino Vuoto", "Digita un importo sul tastierino numerico prima di selezionare il reparto.")
             return
 
-        with self.db.connetti() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id_articolo, codice_ean, nome, prezzo_vendita, quantita FROM articoli WHERE codice_ean = ?", (ean,))
-            res = cursor.fetchone()
-            if res:
-                self.aggiungi_al_carrello(res[0], res[1], res[2], res[3])
-            else:
-                messagebox.showwarning("Articolo non trovato", f"Nessun prodotto a magazzino corrisponde al codice EAN: {ean}")
-
-    def apri_finestra_ricerca_articoli(self):
-        win = ctk.CTkToplevel(self)
-        win.title("Ricerca Articoli Magazzino - Mercurio Retail")
-        win.geometry("600x400")
-        win.grab_set()
-
-        ctk.CTkLabel(win, text="Seleziona un articolo da inserire in cassa", font=ctk.CTkFont(size=15, weight="bold")).pack(pady=10)
-
-        cols = ("ID", "EAN", "Nome", "Giacenza", "Prezzo Vendita")
-        tree = ttk.Treeview(win, columns=cols, show="headings")
-        for col in cols:
-            tree.heading(col, text=col)
-            tree.column(col, width=110)
-        tree.pack(fill="both", expand=True, padx=10, pady=10)
-
-        for art in self.db.ottieni_articoli():
-            px_ven = f"€ {art[5]:.2f}" if art[5] is not None else "€ 0.00"
-            tree.insert("", "end", values=(art[0], art[1], art[2], art[3], px_ven))
-
-        def seleziona_e_chiudi():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning("Attenzione", "Seleziona un articolo.")
-                return
-            vals = tree.item(sel[0], "values")
-            id_art = int(vals[0])
-            ean = vals[1]
-            nome = vals[2]
-            prezzo = float(vals[4].replace("€", "").strip().replace(",", "."))
-            
-            self.aggiungi_al_carrello(id_art, ean, nome, prezzo)
-            win.destroy()
-
-        btn_sel = ctk.CTkButton(win, text="Aggiungi al Carrello", fg_color="#27ae60", command=seleziona_e_chiudi)
-        btn_sel.pack(pady=10)
-
-    def aggiungi_cifra(self, cifra):
-        self.tastierino_buffer += cifra
-        self.lbl_articolo_selezionato.configure(text=f"Digitazione: {self.tastierino_buffer}")
-
-    def pulisci_buffer(self):
-        self.tastierino_buffer = ""
-        self.lbl_articolo_selezionato.configure(text="Pronto alla vendita...")
-
-    def premi_tasto(self, funzione):
-        messagebox.showinfo("Funzione POS", f"Comando '{funzione}' premuto.")
-
-    def aggiungi_vendita_libera(self, nome_prodotto):
-        prezzo = 10.00
-        if self.tastierino_buffer:
-            try:
-                prezzo = float(self.tastierino_buffer.replace(",", "."))
-            except ValueError:
-                pass
-        
-        self.aggiungi_al_carrello(0, "LIBERO", nome_prodotto, prezzo)
-
-    def aggiungi_al_carrello(self, id_art, ean, nome, prezzo):
-        if id_art > 0:
-            for item in self.cart_items:
-                if item["id"] == id_art:
-                    item["qta"] += 1
-                    item["totale"] = item["qta"] * item["prezzo"]
-                    self.aggiorna_carrello()
-                    return
-
-        self.cart_items.append({"id": id_art, "ean": ean, "nome": nome, "prezzo": prezzo, "qta": 1, "totale": prezzo})
-        self.aggiorna_carrello()
-
-    def rimuovi_articolo(self):
-        sel = self.tree_cart.selection()
-        if not sel:
-            messagebox.showwarning("Attenzione", "Seleziona una voce nel carrello da eliminare.")
+        try:
+            prezzo = float(self.importo_tastierino)
+            if prezzo <= 0:
+                raise ValueError()
+        except ValueError:
+            messagebox.showerror("Errore Importo", "Inserisci un importo valido per la vendita libera.")
             return
-        idx = self.tree_cart.index(sel[0])
-        del self.cart_items[idx]
-        self.aggiorna_carrello()
 
-    def nuovo_scontrino(self):
-        self.cart_items = []
-        self.tastierino_buffer = ""
-        self.aggiorna_carrello()
+        item = {
+            "articolo_id": None,
+            "codice": f"REP-{reparto_id}",
+            "descrizione": f"Vendita Libera ({nome_reparto})",
+            "quantita": self.quantita_moltiplicatore,
+            "prezzo_unitario": prezzo,
+            "aliquota_iva": 22.0,
+            "totale": prezzo * self.quantita_moltiplicatore
+        }
 
-    def aggiorna_carrello(self):
-        for item in self.tree_cart.get_children():
-            self.tree_cart.delete(item)
-        
+        self.carrello.append(item)
+        self.play_beep()
+        self.quantita_moltiplicatore = 1.0
+        self.importo_tastierino = ""
+        self.lbl_disp_tastierino.configure(text="Importo: € 0.00")
+        self.aggiorna_interfaccia_carrello()
+
+    # -------------------------------------------------------------------------
+    # GESTIONE CARRELLO E SCANSIONE
+    # -------------------------------------------------------------------------
+    def cerca_e_aggiungi_articolo(self, event=None):
+        codice = self.entry_barcode.get().strip()
+        if not codice:
+            return
+
+        conn = database.get_db_connection()
+        art = conn.execute(
+            "SELECT * FROM articoli WHERE barcode_ean = ? OR codice_interno = ?",
+            (codice, codice)
+        ).fetchone()
+        conn.close()
+
+        if art:
+            item = {
+                "articolo_id": art["id"],
+                "codice": art["codice_interno"],
+                "descrizione": art["descrizione"],
+                "quantita": self.quantita_moltiplicatore,
+                "prezzo_unitario": art["prezzo_vendita_lordo"],
+                "aliquota_iva": 22.0,
+                "totale": art["prezzo_vendita_lordo"] * self.quantita_moltiplicatore
+            }
+            self.carrello.append(item)
+            self.play_beep()
+            self.quantita_moltiplicatore = 1.0
+            self.entry_barcode.delete(0, 'end')
+            self.aggiorna_interfaccia_carrello()
+        else:
+            messagebox.showwarning("Non Trovato", f"Nessun articolo trovato con codice: {codice}")
+
+    def aggiorna_interfaccia_carrello(self):
+        for w in self.scroll_carrello.winfo_children():
+            w.destroy()
+
         totale_generale = 0.0
-        for item in self.cart_items:
-            self.tree_cart.insert("", "end", values=(item["ean"], f"{item['nome']} (x{item['qta']})", item["qta"], f"€ {item['prezzo']:.2f}".replace(".", ","), f"€ {item['totale']:.2f}".replace(".", ",")))
-            totale_generale += item["totale"]
-        
-        num_voci = len(self.cart_items)
-        self.lbl_voci_conteggio.configure(text=f"{num_voci} voci" if num_voci != 1 else "1 voce")
-        self.lbl_voci_totale.configure(text=f"€ {totale_generale:.2f}".replace(".", ","))
-        
-        if self.cart_items:
-            ultimo = self.cart_items[-1]
-            self.lbl_articolo_selezionato.configure(text=ultimo["nome"])
-        else:
-            self.lbl_articolo_selezionato.configure(text="Pronto alla vendita...")
-            
-        self.lbl_totale_grande.configure(text=f"€ {totale_generale:.2f}".replace(".", ","))
-        self.entry_barcode.focus()
 
-    def completa_vendita(self, metodo):
-        if not self.cart_items:
-            messagebox.showwarning("Attenzione", "Impossibile emettere lo scontrino: il carrello è vuoto.")
-            return
-        
-        totale = sum(i["totale"] for i in self.cart_items)
-        ok, msg = self.rt.emetti_scontrino(self.cart_items, totale)
-        
-        if ok:
-            for item in self.cart_items:
-                if item["id"] > 0:
-                    self.db.scarica_giacenza(item["id"], item["qta"])
+        for idx, item in enumerate(self.carrello):
+            totale_generale += item["totale"]
             
-            messagebox.showinfo("Scontrino Fiscale", f"Vendita {metodo} completata!\n{msg}")
-            self.nuovo_scontrino()
+            frame_riga = ctk.CTkFrame(self.scroll_carrello)
+            frame_riga.pack(fill="x", padx=5, pady=2)
+
+            lbl_desc = ctk.CTkLabel(frame_riga, text=f"{item['descrizione']}", anchor="w", font=ctk.CTkFont(weight="bold"))
+            lbl_desc.pack(side="left", padx=10, expand=True, fill="x")
+
+            lbl_dett = ctk.CTkLabel(frame_riga, text=f"{item['quantita']} x € {item['prezzo_unitario']:.2f} = € {item['totale']:.2f}")
+            lbl_dett.pack(side="left", padx=10)
+
+            btn_del = ctk.CTkButton(frame_riga, text="X", width=30, fg_color="#c62828", command=lambda i=idx: self.rimuovi_riga(i))
+            btn_del.pack(side="right", padx=5)
+
+        self.lbl_lcd_totale.configure(text=f"€ {totale_generale:.2f}")
+        if self.carrello:
+            self.lbl_lcd_articolo.configure(text=f"ULTIMO: {self.carrello[-1]['descrizione'][:25]}")
         else:
-            messagebox.showerror("Errore Registratore Telematico", f"Errore comunicazione RT:\n{msg}")
+            self.lbl_lcd_articolo.configure(text="PRONTO ALLA VENDITA")
+
+    def rimuovi_riga(self, indice):
+        if 0 <= indice < len(self.carrello):
+            self.carrello.pop(indice)
+            self.aggiorna_interfaccia_carrello()
+
+    def svuota_carrello(self):
+        self.carrello.clear()
+        self.importo_tastierino = ""
+        self.lbl_disp_tastierino.configure(text="Importo: € 0.00")
+        self.aggiorna_interfaccia_carrello()
+
+    # -------------------------------------------------------------------------
+    # CHIUSURA E REGISTRAZIONE VENDITA CON CALCOLO RESTO CONTANTI
+    # -------------------------------------------------------------------------
+    def concludi_vendita(self, tipo_pagamento):
+        if not self.carrello:
+            messagebox.showwarning("Carrello Vuoto", "Inserisci almeno un articolo o una vendita libera prima di incassare.")
+            return
+
+        totale = sum(item["totale"] for item in self.carrello)
+        importo_pagato = totale
+        resto = 0.0
+
+        # Se il pagamento è in contanti, chiediamo quanto denaro ha consegnato il cliente
+        if tipo_pagamento == "CONTANTI":
+            dialog = ctk.CTkInputDialog(
+                text=f"Totale scontrino: € {totale:.2f}\n\nInserisci contante ricevuto dal cliente:", 
+                title="Incasso Contanti - Calcolo Resto"
+            )
+            valore_inserito = dialog.get_input()
+            
+            if valore_inserito is None:
+                return  # Operazione annullata dall'operatore
+                
+            try:
+                importo_pagato = float(valore_inserito.replace(',', '.'))
+            except ValueError:
+                messagebox.showerror("Errore", "L'importo inserito non è valido.")
+                return
+
+            if importo_pagato < totale:
+                messagebox.showerror(
+                    "Importo Insufficiente", 
+                    f"Il contante inserito (€ {importo_pagato:.2f}) è inferiore al totale dello scontrino (€ {totale:.2f})!"
+                )
+                return
+
+            resto = importo_pagato - totale
+
+        conn = database.get_db_connection()
+        cur = conn.cursor()
+
+        # Genera Numero Scontrino Univoco
+        now = datetime.now()
+        num_scontrino = f"SC-{now.strftime('%Y%m%d%H%M%S')}"
+
+        # Inserisce Testata Movimento con importo pagato e resto registrati
+        cur.execute("""
+        INSERT INTO movimenti_banco (numero_scontrino, data_ora, totale_netto, totale_iva, totale_lordo, tipo_pagamento, importo_pagato, resto)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (num_scontrino, now.strftime('%Y-%m-%d %H:%M:%S'), totale * 0.78, totale * 0.22, totale, tipo_pagamento, importo_pagato, resto))
+
+        movimento_id = cur.lastrowid
+
+        # Inserisce Dettagli e Scarico Magazzino
+        for item in self.carrello:
+            cur.execute("""
+            INSERT INTO dettaglio_scontrini (movimento_id, articolo_id, descrizione_articolo, quantita, prezzo_unitario, aliquota_iva, totale_riga)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (movimento_id, item["articolo_id"], item["descrizione"], item["quantita"], item["prezzo_unitario"], item["aliquota_iva"], item["totale"]))
+
+            if item["articolo_id"]:
+                cur.execute("UPDATE articoli SET giacenza = giacenza - ? WHERE id = ?", (item["quantita"], item["articolo_id"]))
+
+        conn.commit()
+        conn.close()
+
+        self.play_beep()
+
+        # Messaggio di riepilogo con evidenza del Resto per l'operatore
+        messaggio = f"Scontrino {num_scontrino} emesso con successo!\n\n"
+        messaggio += f"• Totale Scontrino: € {totale:.2f}\n"
+        if tipo_pagamento == "CONTANTI":
+            messaggio += f"• Contante Ricevuto: € {importo_pagato:.2f}\n"
+            messaggio += f"👉 RESTO DA DARE: € {resto:.2f}\n\n"
+        messaggio += f"Metodo: {tipo_pagamento}"
+
+        messagebox.showinfo("Incasso Completato", messaggio)
+        self.svuota_carrello()

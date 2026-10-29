@@ -21,12 +21,15 @@ class DatabaseManager:
         self.crea_tabelle()
 
     def connetti(self):
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def crea_tabelle(self):
         with self.connetti() as conn:
             cursor = conn.cursor()
             
+            # Tabella Clienti completa
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS clienti (
                     id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,11 +38,19 @@ class DatabaseManager:
                     azienda TEXT,
                     partita_iva TEXT,
                     codice_fiscale TEXT,
+                    indirizzo TEXT,
+                    numero_civico TEXT,
+                    cap TEXT,
+                    localita TEXT,
+                    provincia TEXT,
                     telefono TEXT,
-                    email TEXT
+                    email TEXT,
+                    pec TEXT,
+                    codice_univoco TEXT
                 )
             """)
 
+            # Tabella Fidelity Card
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS fidelity_card (
                     id_card INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,52 +61,49 @@ class DatabaseManager:
                 )
             """)
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS fornitori (
-                    id_fornitore INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ragione_sociale TEXT NOT NULL,
-                    partita_iva TEXT,
-                    email TEXT,
-                    telefono TEXT
-                )
-            """)
-
+            # Tabella Magazzino / Articoli completa
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS articoli (
                     id_articolo INTEGER PRIMARY KEY AUTOINCREMENT,
                     codice_ean TEXT UNIQUE NOT NULL,
                     nome TEXT NOT NULL,
-                    quantita INTEGER DEFAULT 0,
-                    prezzo_acquisto REAL,
-                    prezzo_vendita REAL NOT NULL
+                    descrizione TEXT,
+                    categoria TEXT,
+                    fornitore TEXT,
+                    quantita REAL DEFAULT 0.0,
+                    prezzo_acquisto REAL DEFAULT 0.0,
+                    prezzo_vendita REAL NOT NULL,
+                    aliquota_iva REAL DEFAULT 22.0
                 )
             """)
 
+            # Tabella Movimenti di Banco / Documenti
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS documenti (
-                    id_documento INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tipo_documento TEXT NOT NULL,
-                    numero_documento TEXT NOT NULL,
-                    data_documento TEXT NOT NULL,
-                    id_cliente INTEGER,
-                    totale REAL DEFAULT 0.0,
-                    metodo_pagamento TEXT,
-                    FOREIGN KEY (id_cliente) REFERENCES clienti(id_cliente)
+                CREATE TABLE IF NOT EXISTS movimenti_banco (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    numero_scontrino TEXT UNIQUE NOT NULL,
+                    data_ora TEXT NOT NULL,
+                    totale_netto REAL NOT NULL,
+                    totale_iva REAL NOT NULL,
+                    totale_lordo REAL NOT NULL,
+                    tipo_pagamento TEXT NOT NULL,
+                    importo_pagato REAL DEFAULT 0.0,
+                    resto REAL DEFAULT 0.0
                 )
             """)
+            conn.commit()
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS dettagli_documento (
-                    id_dettaglio INTEGER PRIMARY KEY AUTOINCREMENT,
-                    id_documento INTEGER NOT NULL,
-                    id_articolo INTEGER NOT NULL,
-                    quantita INTEGER NOT NULL,
-                    prezzo_unitario REAL NOT NULL,
-                    subtotale REAL NOT NULL,
-                    FOREIGN KEY (id_documento) REFERENCES documenti(id_documento),
-                    FOREIGN KEY (id_articolo) REFERENCES articoli(id_articolo)
-                )
-            """)
+            # Reparti predefiniti di comodo
+            cursor.execute("SELECT COUNT(*) FROM reparti")
+            if cursor.fetchone()[0] == 0:
+                reparti_default = [
+                    ("Generico", 22.0),
+                    ("Alimentari", 10.0),
+                    ("Abbigliamento", 22.0),
+                    ("Servizi", 22.0)
+                ]
+                cursor.executemany("INSERT INTO reparti (nome_reparto, aliquota_iva) VALUES (?, ?)", reparti_default)
+
             conn.commit()
 
     def cerca_fidelity(self, codice_carta):
@@ -180,3 +188,14 @@ class DatabaseManager:
             cursor.execute("DELETE FROM fidelity_card WHERE id_cliente = ?", (id_cliente,))
             cursor.execute("DELETE FROM clienti WHERE id_cliente = ?", (id_cliente,))
             conn.commit()
+
+# --- Funzioni di comodo globali per retrocompatibilità con app.py e pos_module.py ---
+_db_manager = DatabaseManager()
+
+def get_db_connection():
+    """Restituisce una connessione attiva tramite DatabaseManager."""
+    return _db_manager.connetti()
+
+def init_db():
+    """Inizializza il database e le tabelle."""
+    _db_manager.crea_tabelle()

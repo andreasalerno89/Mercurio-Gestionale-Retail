@@ -1,78 +1,90 @@
+import tkinter as tk
+from tkinter import messagebox
 import customtkinter as ctk
-from database import DatabaseManager
-from pos_module import ModuloPOS
-from warehouse_module import ModuloMagazzino
-from clients_module import ModuloClienti
-from settings_module import ModuloImpostazioni
 
-ctk.set_appearance_mode("System")
+# Import dei moduli interni del gestionale
+from database import init_db
+from pos_module import POSModule
+from warehouse_module import WarehouseModule
+from clients_module import ClientsModule
+from documents_module import DocumentsModule
+from settings_module import SettingsModule
+
+# Configurazione tema CustomTkinter
+ctk.set_appearance_mode("System")  # "System", "Dark", "Light"
 ctk.set_default_color_theme("blue")
 
-class MercurioERP(ctk.CTk):
+class MercurioApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.db = DatabaseManager()
 
-        self.title("Mercurio Gestionale Retail - v0.1.0-alpha")
-        self.geometry("1250x720")
+        self.title("Mercurio Gestionale Retail - v0.2.1-alpha")
+        self.geometry("1200x750")
+        self.minsize(1000, 650)
 
-        # Configurazione Icona Finestra e UI
-        try:
-            self.iconbitmap("icona.ico")
-        except Exception:
-            pass
+        # Inizializzazione del Database SQLite
+        init_db()
 
-        try:
-            from PIL import Image, ImageTk
-            img_icon = Image.open("icona.ico")
-            self.iconphoto(True, ImageTk.PhotoImage(img_icon))
-        except Exception:
-            pass
+        # Layout principale a griglia
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        self.create_header()
+        self.create_main_tabs()
 
-        # Sidebar di navigazione
-        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0)
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+    def create_header(self):
+        """Crea l'intestazione grafica principale in alto"""
+        header_frame = ctk.CTkFrame(self, fg_color="transparent", height=60)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
+        header_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.sidebar, text="MERCURIO\nRETAIL", font=ctk.CTkFont(size=22, weight="bold")).pack(padx=20, pady=30)
+        title_label = ctk.CTkLabel(
+            header_frame, 
+            text="Mercurio Gestionale Retail", 
+            font=ctk.CTkFont(size=22, weight="bold")
+        )
+        title_label.grid(row=0, column=0, sticky="w")
 
-        ctk.CTkButton(self.sidebar, text="Cassa / POS", height=42, command=self.mostra_pos).pack(padx=20, pady=10, fill="x")
-        ctk.CTkButton(self.sidebar, text="Gestione Magazzino", height=42, command=self.mostra_magazzino).pack(padx=20, pady=10, fill="x")
-        ctk.CTkButton(self.sidebar, text="Clienti & Fidelity", height=42, command=self.mostra_clienti).pack(padx=20, pady=10, fill="x")
-        ctk.CTkButton(self.sidebar, text="Impostazioni & RT", height=42, fg_color="#7f8c8d", hover_color="#626567", command=self.mostra_impostazioni).pack(padx=20, pady=(30, 10), fill="x")
+        version_label = ctk.CTkLabel(
+            header_frame, 
+            text="v0.2.1-alpha (GPLv3)", 
+            font=ctk.CTkFont(size=12, slant="italic")
+        )
+        version_label.grid(row=0, column=1, sticky="e")
 
-        # Contenitore dei moduli
-        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=15, pady=15)
+    def create_main_tabs(self):
+        """Crea il sistema di tab orizzontale per raccogliere tutti i moduli in un'unica finestra"""
+        self.tab_view = ctk.CTkTabview(self, corner_radius=12)
+        self.tab_view.grid(row=1, column=0, sticky="nsew", padx=20, pady=(5, 20))
 
-        self.mostra_pos()
+        # Creazione delle Tab principali
+        tab_pos = self.tab_view.add("🛒 Banco POS")
+        tab_warehouse = self.tab_view.add("📦 Magazzino")
+        tab_clients = self.tab_view.add("👥 Clienti & Fidelity")
+        tab_docs = self.tab_view.add("📄 Documenti Banco")
+        tab_settings = self.tab_view.add("⚙️ Impostazioni")
 
-    def reset_content(self):
-        for w in self.content_frame.winfo_children():
-            w.destroy()
+        # Configurazione layout interno di ogni tab
+        for tab in [tab_pos, tab_warehouse, tab_clients, tab_docs, tab_settings]:
+            tab.grid_rowconfigure(0, weight=1)
+            tab.grid_columnconfigure(0, weight=1)
 
-    def mostra_pos(self):
-        self.reset_content()
-        pos = ModuloPOS(self.content_frame, self.db)
-        pos.pack(fill="both", expand=True)
+        # Inserimento dei singoli moduli all'interno delle rispettive tab
+        self.pos_view = POSModule(tab_pos, app_instance=self)
+        self.pos_view.grid(row=0, column=0, sticky="nsew")
 
-    def mostra_magazzino(self):
-        self.reset_content()
-        mag = ModuloMagazzino(self.content_frame, self.db)
-        mag.pack(fill="both", expand=True)
+        self.warehouse_view = WarehouseModule(tab_warehouse, app_instance=self)
+        self.warehouse_view.grid(row=0, column=0, sticky="nsew")
 
-    def mostra_clienti(self):
-        self.reset_content()
-        cli = ModuloClienti(self.content_frame, self.db)
-        cli.pack(fill="both", expand=True)
+        self.clients_view = ClientsModule(tab_clients, app_instance=self)
+        self.clients_view.grid(row=0, column=0, sticky="nsew")
 
-    def mostra_impostazioni(self):
-        self.reset_content()
-        settings = ModuloImpostazioni(self.content_frame)
-        settings.pack(fill="both", expand=True)
+        self.documents_view = DocumentsModule(tab_docs, app_instance=self)
+        self.documents_view.grid(row=0, column=0, sticky="nsew")
+
+        self.settings_view = SettingsModule(tab_settings, app_instance=self)
+        self.settings_view.grid(row=0, column=0, sticky="nsew")
 
 if __name__ == "__main__":
-    app = MercurioERP()
+    app = MercurioApp()
     app.mainloop()
