@@ -1,33 +1,25 @@
-# === Compilazione ed Eseguibili ===
+# Python bytecode e cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Directory di build e distribuzione (PyInstaller e Inno Setup)
 build/
 dist/
 Output/
 *.spec
 
-# === Database Locale e Dati Temporanei ===
-*.db
-*.sqlite
-*.sqlite3
-mercurio_retail.db
+# File di configurazione locali o dati sensibili
+config_mercurio.json
 
-# === Cache di Python e Bytecode ===
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# === Ambienti Virtuali ===
-venv/
-.venv/
-env/
-ENV/
-
-# === File degli Editor e IDE ===
+# Editor e IDE (VS Code, PyCharm, ecc.)
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# === File di sistema Windows ===
+# Log e file temporanei di sistema
+*.log
 Thumbs.db
 desktop.ini

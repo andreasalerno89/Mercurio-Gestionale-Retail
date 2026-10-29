@@ -3,7 +3,7 @@ TITLE Mercurio Gestionale Retail - Automazione Build & Installer
 COLOR 0A
 
 echo =======================================================================
-echo          MERCURIO GESTIONALE RETAIL v0.2.1-alpha (Build System)
+echo         MERCURIO GESTIONALE RETAIL v0.2.1-alpha (Build System)
 echo =======================================================================
 echo.
 
@@ -13,11 +13,11 @@ IF NOT EXIST "config_mercurio.json" (
     echo { "nome_negozio": "Mercurio Store", "piva": "", "modalita": "IP", "ip": "192.168.1.100", "porta_ip": 9100, "com": "COM1", "baudrate": 9600, "flusso": "XON/XOFF" } > config_mercurio.json
 )
 
-:: 1. Pulizia cartelle di build precedenti
+:: 1. Pulizia cartelle di build precedenti (Preservando la cartella Output)
 echo [1/3] Pulizia vecchi file di compilazione...
 IF EXIST "build" RD /S /Q "build"
 IF EXIST "dist" RD /S /Q "dist"
-IF EXIST "Output" RD /S /Q "Output"
+:: Nota: La cartella Output viene preservata per non perdere i vecchi installer
 IF EXIST "*.spec" DEL /F /Q "*.spec"
 echo [OK] Pulizia completata.
 echo.

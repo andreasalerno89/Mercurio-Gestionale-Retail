@@ -1,59 +1,66 @@
-# Mercurio Gestionale Retail 🚀
-**Un sistema ERP e POS open-source moderno, leggero e intuitivo per la gestione del punto vendita.**
+# 🛒 Mercurio Gestionale Retail (v0.2.1-alpha)
 
-![Versione](https://img.shields.io/badge/versione-0.1.0--alpha-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.10%2B-yellow.svg)
-![Licenza](https://img.shields.io/badge/licenza-GPL%20v3-green.svg)
+**Mercurio Gestionale Retail** è un software gestionale moderno, leggero e modulare sviluppato in Python, pensato per ottimizzare e semplificare le attività di vendita al banco, gestione del magazzino, anagrafica clienti e fatturazione per esercizi commerciali e punti vendita.
 
----
-
-## 📋 Descrizione del Progetto
-**Mercurio Gestionale Retail** è un software gestionale (ERP/POS) progettato specificamente per le attività commerciali al dettaglio. Sviluppato in Python con un'interfaccia moderna basata su **CustomTkinter**, offre una soluzione nativa per Windows stabile, veloce e totalmente indipendente da costosi servizi cloud di terze parti.
-
-I dati aziendali vengono salvati in sicurezza all'interno della cartella `%LOCALAPPDATA%\MercurioRetail`, garantendo la massima compatibilità con i permessi di scrittura di Windows (anche in ambienti multi-utente o di esecuzione da `Programmi`).
+L'interfaccia grafica è realizzata interamente con **CustomTkinter**, offrendo un design moderno, pulito e nativo in stile Dark/Light mode.
 
 ---
 
-## 🛠️ Moduli Principali
-* **Cassa / POS**: Interfaccia di vendita rapida per la scansione di codici EAN, gestione carrello, calcolo del resto e applicazione di sconti.
-* **Gestione Magazzino**: Monitoraggio delle giacenze, inserimento articoli, controllo dei prezzi d'acquisto e di vendita e scarico automatico delle scorte.
-* **Clienti & Fidelity**: Anagrafica clienti completa, gestione P.IVA/Codice Fiscale e programmi fedeltà con raccolta punti tramite codici carta dedicati (`FID-XXXXXX`).
-* **Impostazioni & RT**: Configurazione dei parametri di sistema e simulazione dell'interfacciamento con i registratori telematici.
+## 🚀 Architettura Modulare
+
+Il progetto adotta una struttura modulare per facilitare la manutenzione, l'estensibilità e la scalabilità delle funzioni:
+
+*   **`app.py`** - File principale di avvio e gestione del layout di navigazione (Sidebar / Router dei moduli).
+*   **`pos_module.py`** - Modulo Punto Vendita (Cassa, carrello, scontrini, calcolo del resto e gestione transazioni).
+*   **`warehouse_module.py`** - Gestione Magazzino (Carico/scarico merci, giacenze, prezzi e ricerca articoli).
+*   **`clients_module.py`** - Anagrafica Clienti & Fidelity (Gestione tessere, storico acquisti e dati anagrafici).
+*   **`documents_module.py`** - Gestione Documenti (Emissione scontrini, fatture e documenti commerciali).
+*   **`settings_module.py`** - Impostazioni di Sistema e configurazione parametri negozio.
+*   **`database.py`** - Livello di astrazione e gestione del database locale.
+*   **`registratore_telematico.py`** - Integrazione e comunicazione con i registratori telematici per la trasmissione dei corrispettivi.
 
 ---
 
-## ⚙️ Stack Tecnologico
-* **Linguaggio**: Python 3.10+
-* **Interfaccia Grafica**: CustomTkinter
-* **Database**: SQLite3
-* **Gestione Immagini**: Pillow (PIL)
-* **Packaging & Distribuzione**: PyInstaller & Inno Setup
+## 🛠️ Requisiti di Sistema e Dipendenze
+
+Per eseguire o compilare il progetto in locale, assicurati di avere installato:
+*   **Python 3.10+**
+*   Librerie Python principali:
+    *   `customtkinter`
+    *   Altre dipendenze specificate nel progetto.
+*   **PyInstaller** (per la generazione dell'eseguibile standalone).
+*   **Inno Setup 6** (opzionale, per la compilazione del pacchetto di installazione Windows).
 
 ---
 
-## 📦 Installazione e Compilazione
+## ⚙️ Compilazione Automatica (Build System)
 
-### 1. Requisiti di Sistema
-Assicurati di avere Python 3.10 o superiore installato sul tuo sistema.
+Il progetto include uno script batch automatizzato (`build_exe.bat`) che gestisce la pulizia della cache, la compilazione tramite **PyInstaller** (generando la cartella `dist\app`) e la preparazione dei file di configurazione (`config_mercurio.json`).
 
-### 2. Installazione delle dipendenze
-Clona il repository e installa i pacchetti necessari tramite pip:
-```bash
-pip install -r requirements.txt
-3. Avvio in modalità sviluppo
-Bash
-python app.py
-4. Generazione dell'Eseguibile e dell'Installer
-Compilazione tramite script batch:
-Esegui il file build_exe.bat per generare la cartella di distribuzione tramite PyInstaller con l'icona personalizzata incorporata.
+Per creare l'eseguibile in autonomia:
+1. Avvia il prompt dei comandi nella cartella del progetto.
+2. Esegui lo script:
+   ```cmd
+   build_exe.bat
+L'eseguibile e le risorse saranno pronti all'interno della cartella dist\app\.
 
-Creazione del pacchetto di setup (.exe):
-Apri il file setup_script.iss con Inno Setup Compiler e compialo per generare l'installer ufficiale nella cartella Output/.
+Per generare il pacchetto di installazione definitivo (Setup_Mercurio_Retail_v0.2.1-alpha.exe), apri il file setup_script.iss con Inno Setup Compiler e premi F9.
 
-🤝 Contribuire
-I contributi, le segnalazioni di problemi (issues) e le richieste di nuove funzionalità sono ben accetti. Trattandosi di un software open-source, sentiti libero di aprire una Pull Request.
+📦 Struttura del Repository
+Plaintext
+├── app.py                     # Entry point principale
+├── pos_module.py              # Modulo Punto Vendita / Cassa
+├── warehouse_module.py        # Modulo Gestione Magazzino
+├── clients_module.py          # Modulo Anagrafica Clienti
+├── documents_module.py        # Modulo Gestione Documenti
+├── settings_module.py         # Modulo Impostazioni
+├── database.py                # Connettore e gestione Database
+├── registratore_telematico.py # Interfaccia RT
+├── config_mercurio.json       # Configurazione locale predefinita
+├── build_exe.bat              # Script di automazione build
+├── setup_script.iss           # Script Inno Setup per l'Installer
+└── README.md                  # Documentazione del progetto
+👤 Autore & Licenza
+Sviluppatore: Andrea Salerno
 
-📄 Licenza
-Questo progetto è rilasciato sotto i termini della GNU General Public License v3.0. Vedi il file LICENSE per maggiori dettagli.
-
-Autore: Andrea Salerno
+Versione: 0.2.1-alpha
