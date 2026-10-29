@@ -1,0 +1,33 @@
+# === Compilazione ed Eseguibili ===
+build/
+dist/
+Output/
+*.spec
+
+# === Database Locale e Dati Temporanei ===
+*.db
+*.sqlite
+*.sqlite3
+mercurio_retail.db
+
+# === Cache di Python e Bytecode ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === Ambienti Virtuali ===
+venv/
+.venv/
+env/
+ENV/
+
+# === File degli Editor e IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === File di sistema Windows ===
+Thumbs.db
+desktop.ini
