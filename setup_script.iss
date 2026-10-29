@@ -1,31 +1,26 @@
-; Script Inno Setup per Mercurio Gestionale Retail v0.2.1-alpha
-; Compilare con Inno Setup 6 (https://jrsoftware.org/isinfo.php)
+; Script di installazione per Mercurio Gestionale Retail v0.2.1-alpha
+; Generato per Inno Setup 6
 
 #define MyAppName "Mercurio Gestionale Retail"
 #define MyAppVersion "0.2.1-alpha"
 #define MyAppPublisher "Andrea Salerno"
-#define MyAppURL "https://github.com/andreasalerno/mercurio-retail"
-#define MyAppExeName "app.exe"
+#define MyAppExeName "MercurioGestionale.exe"
 
 [Setup]
-; Identificatore unico dell'applicazione
-AppId={{D3F9B2C4-8E1A-4D5F-9B3E-7C2A10F6829D}
+; Unique App ID per la gestione corretta di disinstallazioni e aggiornamenti
+AppId={{B2D157B5-F832-412E-9C81-839F11E1D942}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={autopf}\MercurioRetail
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=LICENSE
-; File dell'installer generato in output
+; Cartella di output dove Inno Setup salverà il file .exe finale dell'installer
+OutputDir=Output
 OutputBaseFilename=Setup_Mercurio_Retail_v0.2.1-alpha
-Compression=lzma2/ultra64
+Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=icona.ico
 
 [Languages]
 Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
@@ -34,17 +29,13 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; File eseguibile principale generato da PyInstaller (nella cartella dist\app)
-Source: "dist\app\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; Tutti i file e moduli di supporto presenti nella cartella di build
-Source: "dist\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; File di configurazione predefinito locale
-Source: "config_mercurio.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; Preleva l'intera cartella generata da PyInstaller (assicurati che il nome corrisponda a dist\MercurioGestionale)
+Source: "dist\MercurioGestionale\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icona.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icona.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

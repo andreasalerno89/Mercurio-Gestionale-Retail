@@ -29,6 +29,15 @@ class DatabaseManager:
         with self.connetti() as conn:
             cursor = conn.cursor()
             
+            # --- TABELLA REPARTI (Aggiunta per correggere l'errore) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reparti (
+                    id_reparto INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome_reparto TEXT UNIQUE NOT NULL,
+                    aliquota_iva REAL DEFAULT 22.0
+                )
+            """)
+            
             # Tabella Clienti completa
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS clienti (

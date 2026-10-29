@@ -149,27 +149,33 @@ class POSModule(ctk.CTkFrame):
         self.lbl_disp_tastierino.configure(text=txt)
 
     def carica_reparti(self):
-        """Carica dinamicamente i reparti dal DB e crea i pulsanti di vendita libera."""
+        """Carica i reparti dal database e popola dinamicamente i pulsanti di vendita rapida."""
         for w in self.frame_reparti.winfo_children():
             w.destroy()
 
-        conn = database.get_db_connection()
-        reparti = conn.execute("SELECT * FROM reparti").fetchall()
-        conn.close()
+        try:
+            conn = database.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id_reparto, nome_reparto FROM reparti")
+            reparti = cursor.fetchall()
+            conn.close()
 
-        r, c = 0, 0
-        for rep in reparti:
-            r_id = rep["id"]
-            r_nome = rep["nome_reparto"]
-            btn = ctk.CTkButton(
-                self.frame_reparti, text=r_nome, fg_color="#37474f", height=35,
-                command=lambda id_rep=r_id, nome_rep=r_nome: self.aggiungi_vendita_libera(id_rep, nome_rep)
-            )
-            btn.grid(row=r, column=c, sticky="ew", padx=3, pady=3)
-            c += 1
-            if c > 1:
-                c = 0
-                r += 1
+            if not reparti:
+                reparti = [{"id_reparto": 1, "nome_reparto": "Generico"}]
+
+            for index, rep in enumerate(reparti):
+                r_id = rep["id_reparto"]
+                r_nome = rep["nome_reparto"]
+
+                btn = ctk.CTkButton(
+                    self.frame_reparti, text=r_nome, height=35,
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                    command=lambda rid=r_id, rnom=r_nome: self.aggiungi_vendita_libera(rid, rnom)
+                )
+                btn.grid(row=index // 2, column=index % 2, sticky="ew", padx=3, pady=3)
+
+        except Exception as e:
+            print(f"[ERRORE] Impossibile caricare i reparti: {e}")
 
     def aggiungi_vendita_libera(self, reparto_id, nome_reparto):
         """Aggiunge una voce libera a carrello basata sull'importo digitato sul tastierino."""
@@ -212,20 +218,20 @@ class POSModule(ctk.CTkFrame):
 
         conn = database.get_db_connection()
         art = conn.execute(
-            "SELECT * FROM articoli WHERE barcode_ean = ? OR codice_interno = ?",
-            (codice, codice)
+            "SELECT * FROM articoli WHERE codice_ean = ?",
+            (codice,)
         ).fetchone()
         conn.close()
 
         if art:
             item = {
-                "articolo_id": art["id"],
-                "codice": art["codice_interno"],
-                "descrizione": art["descrizione"],
+                "articolo_id": art["id_articolo"],
+                "codice": art["codice_ean"],
+                "descrizione": art["nome"],
                 "quantita": self.quantita_moltiplicatore,
-                "prezzo_unitario": art["prezzo_vendita_lordo"],
-                "aliquota_iva": 22.0,
-                "totale": art["prezzo_vendita_lordo"] * self.quantita_moltiplicatore
+                "prezzo_unitario": art["prezzo_vendita"],
+                "aliquota_iva": art["aliquota_iva"],
+                "totale": art["prezzo_vendita"] * self.quantita_moltiplicatore
             }
             self.carrello.append(item)
             self.play_beep()
@@ -323,18 +329,6 @@ class POSModule(ctk.CTkFrame):
         INSERT INTO movimenti_banco (numero_scontrino, data_ora, totale_netto, totale_iva, totale_lordo, tipo_pagamento, importo_pagato, resto)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (num_scontrino, now.strftime('%Y-%m-%d %H:%M:%S'), totale * 0.78, totale * 0.22, totale, tipo_pagamento, importo_pagato, resto))
-
-        movimento_id = cur.lastrowid
-
-        # Inserisce Dettagli e Scarico Magazzino
-        for item in self.carrello:
-            cur.execute("""
-            INSERT INTO dettaglio_scontrini (movimento_id, articolo_id, descrizione_articolo, quantita, prezzo_unitario, aliquota_iva, totale_riga)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (movimento_id, item["articolo_id"], item["descrizione"], item["quantita"], item["prezzo_unitario"], item["aliquota_iva"], item["totale"]))
-
-            if item["articolo_id"]:
-                cur.execute("UPDATE articoli SET giacenza = giacenza - ? WHERE id = ?", (item["quantita"], item["articolo_id"]))
 
         conn.commit()
         conn.close()

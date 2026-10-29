@@ -27,7 +27,7 @@ echo [2/3] Generazione eseguibile con PyInstaller...
 pyinstaller --noconfirm --onedir --windowed ^
     --icon="icona.ico" ^
     --add-data "config_mercurio.json;." ^
-    --name "app" ^
+    --name "MercurioGestionale" ^
     app.py
 
 IF %ERRORLEVEL% NEQ 0 (
