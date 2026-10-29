@@ -1,4 +1,4 @@
-Mercurio Gestionale Retail (v0.2.1-alpha)
+# Mercurio Gestionale Retail (v0.2.1-alpha)
 
 Software gestionale cross-platform sviluppato in Python, progettato specificamente per la gestione di punti vendita e attività commerciali (moduli POS ed ERP integrati).
 
@@ -38,9 +38,3 @@ Il software adotta una struttura modulare basata su Python e Tkinter/CustomTkint
 2. Installa le dipendenze:
    ```bash
    pip install -r requirements.txt
-Avvia l'applicazione:
-
-Bash
-python app.py
-📄 Licenza
-Progetto distribuito sotto licenza MIT. Vedi il file LICENSE per maggiori dettagli.
