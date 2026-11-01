@@ -1,72 +1,99 @@
 @echo off
-TITLE Mercurio Gestionale Retail - Automazione Build & Installer
-COLOR 0A
+SETLOCAL EnableDelayedExpansion
+
+:: Spostati automaticamente nella cartella in cui si trova questo file batch
+cd /d "%~dp0"
 
 echo =======================================================================
-echo         MERCURIO GESTIONALE RETAIL v0.2.1-alpha (Build System)
+echo     MERCURIO GESTIONALE RETAIL v0.3.0 Alpha (Build ^& Setup Automation)
 echo =======================================================================
 echo.
 
-:: 0. Assicura che esista almeno un file config_mercurio.json di base
-IF NOT EXIST "config_mercurio.json" (
-    echo [INFO] Creo un file config_mercurio.json predefinito...
-    echo { "nome_negozio": "Mercurio Store", "piva": "", "modalita": "IP", "ip": "192.168.1.100", "porta_ip": 9100, "com": "COM1", "baudrate": 9600, "flusso": "XON/XOFF" } > config_mercurio.json
+:: [0/5] Verifiche preliminari
+echo [0/5] Verifica prerequisiti...
+
+python --version >nul 2>&1
+IF %ERRORLEVEL% NEQ 0 (
+    echo [ERRORE] Python non trovato nel PATH. Installalo o attivalo prima di procedere.
+    goto error
 )
 
-:: 1. Pulizia cartelle di build precedenti (Preservando la cartella Output)
-echo [1/3] Pulizia vecchi file di compilazione...
-IF EXIST "build" RD /S /Q "build"
-IF EXIST "dist" RD /S /Q "dist"
-:: Nota: La cartella Output viene preservata per non perdere i vecchi installer
-IF EXIST "*.spec" DEL /F /Q "*.spec"
+IF NOT EXIST "icona.ico" (
+    echo [ERRORE] File "icona.ico" non trovato nella cartella radice del progetto.
+    goto error
+)
+
+IF NOT EXIST "setup_script.iss" (
+    echo [ERRORE] File "setup_script.iss" non trovato. Necessario per Inno Setup.
+    goto error
+)
+
+IF NOT EXIST "src\main.py" (
+    echo [ERRORE] File "src\main.py" non trovato. Sei nella cartella corretta?
+    goto error
+)
+echo [OK] Prerequisiti verificati.
+echo.
+
+:: [1/5] Pulizia vecchi file di compilazione
+echo [1/5] Pulizia vecchi file di compilazione...
+IF EXIST "build" rmdir /s /q "build"
+IF EXIST "dist" rmdir /s /q "dist"
+del /f /q *.spec 2>nul
 echo [OK] Pulizia completata.
 echo.
 
-:: 2. Compilazione con PyInstaller
-echo [2/3] Generazione eseguibile con PyInstaller...
-pyinstaller --noconfirm --onedir --windowed ^
-    --icon="icona.ico" ^
-    --add-data "config_mercurio.json;." ^
+:: [2/5] Generazione eseguibile con PyInstaller
+echo [2/5] Generazione eseguibile con PyInstaller...
+python -m PyInstaller --noconfirm --clean --onedir --windowed ^
     --name "MercurioGestionale" ^
-    app.py
+    --icon "icona.ico" ^
+    --paths "src" ^
+    "src/main.py"
 
 IF %ERRORLEVEL% NEQ 0 (
-    COLOR 0C
+    echo.
     echo [ERRORE] La compilazione PyInstaller e' fallita.
-    pause
-    exit /b %ERRORLEVEL%
+    goto error
 )
-echo [OK] Eseguibile PyInstaller generato con successo in dist\app.
+echo [OK] Eseguibile generato con successo nella cartella dist\.
 echo.
 
-:: 3. Compilazione Installer con Inno Setup (Cerca Inno Setup 6)
-echo [3/3] Generazione pacchetto di installazione con Inno Setup...
-SET "INNO_PATH="
+:: [3/5] Compilazione Installer con Inno Setup
+echo [3/5] Compilazione del pacchetto di installazione con Inno Setup...
 
-IF EXIST "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
-    SET "INNO_PATH=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-) ELSE IF EXIST "%ProgramFiles%\Inno Setup 6\ISCC.exe" (
-    SET "INNO_PATH=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+SET "ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+IF NOT EXIST "%ISCC_PATH%" SET "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
+
+IF NOT EXIST "%ISCC_PATH%" (
+    echo [ERRORE] Impossibile trovare il compilatore di Inno Setup (ISCC.exe).
+    echo         Installa Inno Setup 6 da https://jrsoftware.org/isdl.php
+    goto error
 )
 
-IF DEFINED INNO_PATH (
-    "%INNO_PATH%" "setup_script.iss"
-    IF %ERRORLEVEL% EQU 0 (
-        COLOR 0A
-        echo.
-        echo =======================================================================
-        echo [SUCCESSO] BUILD E INSTALLER GENERATI CON SUCCESSO!
-        echo L'installer e' pronto nella cartella Output\
-        echo =======================================================================
-    ) ELSE (
-        COLOR 0E
-        echo [ATTENZIONE] Errore durante la compilazione con Inno Setup.
-    )
-) ELSE (
-    COLOR 0E
-    echo [INFO] Inno Setup 6 (ISCC.exe) non trovato nei percorsi standard.
-    echo Puoi aprire 'setup_script.iss' direttamente dall'interfaccia di Inno Setup.
-)
+"%ISCC_PATH%" "setup_script.iss"
 
+IF %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [ERRORE] La compilazione di Inno Setup e' fallita.
+    goto error
+)
+echo [OK] Installer creato con successo nella cartella Output\.
+echo.
+
+:: [4/5] Completamento
+echo =======================================================================
+echo     PROCESSO COMPLETATO CON SUCCESSO!
+echo     L'installer e' pronto nella cartella Output\
+echo =======================================================================
+goto end
+
+:error
+echo.
+echo [ERRORE] Il processo di build e' stato interrotto a causa di un errore.
+pause
+exit /b %ERRORLEVEL%
+
+:end
 echo.
 pause

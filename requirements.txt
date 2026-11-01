@@ -1,4 +1,14 @@
-customtkinter==5.2.2
-pillow==10.4.0
-pyserial==3.5
-pyinstaller==6.8.0
+# Mercurio Gestionale Retail Enterprise
+#
+# Questo progetto utilizza esclusivamente la libreria standard di Python 3.
+# Non sono necessarie dipendenze esterne di terze parti via pip.
+#
+# Requisiti di sistema:
+# - Python >= 3.9 con supporto Tkinter abilitato
+#   (su Windows: incluso nell'installer ufficiale python.org;
+#    su Debian/Ubuntu: sudo apt install python3-tk)
+#
+# Per l'ambiente di sviluppo (build dell'eseguibile):
+# - pyinstaller (solo per la build, non per l'esecuzione)
+
+# --- Nessuna dipendenza runtime ---

@@ -1,47 +1,152 @@
 # Changelog
 
-Tutti i cambiamenti rilevanti a questo progetto saranno documentati in questo file.
+Tutte le modifiche rilevanti a questo progetto sono documentate in questo file.
 
-Il formato si basa su [Keep a Changelog](https://keepachangelog.com/it/1.0.0/)
-e questo progetto rispetta il [Semantic Versioning](https://semver.org/lang/it/).
-
----
-
-## [0.2.1-alpha] - 2026-10-29
-
-### ➕ Aggiunto
-- **Tastierino Numerico POS**: Reintegrata la pulsantiera numerica touch/click (`0-9`, `.`, `C`) nel modulo POS (`pos_module.py`) per la battuta rapida degli importi.
-- **Vendita Libera a Reparto**: Possibilità di assegnare l'importo digitato sul tastierino a un reparto specifico (es. *Generico*, *Alimentari*, *Abbigliamento*) per gli articoli non censiti a catalogo.
-- **Modulo Contanti e Calcolo Resto**:
-  - Finestra di dialogo dedicata per l'incasso in contanti con richiesta dell'importo consegnato dal cliente.
-  - Calcolo automatico e immediato del resto a schermo con riscontro visivo chiaro per l'operatore di cassa.
-  - Registrazione dei campi `importo_pagato` e `resto` nella tabella `movimenti_banco` del database SQLite per la quadratura di cassa.
-
-### 🔄 Modificato
-- Aggiornati gli script di deployment e build:
-  - `build_exe.bat` per la compilazione automatica con PyInstaller puntando al pacchetto `MercurioRetail_v0.2.1-alpha`.
-  - `setup_script.iss` per la generazione dell'installer Windows `Setup_MercurioRetail_v0.2.1-alpha.exe`.
+Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) e il progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
-## [0.2.0-alpha] - 2026-10-29
+## [v0.3.0 Alpha] - 2026-11-01
 
-### ➕ Aggiunto
-- **Architettura Modulare ERP/POS**: Struttura dell'applicazione riorganizzata in moduli trasversali integrati nella dashboard principale (`app.py`).
-- **Modulo POS Avanzato**: Display LCD in stile cassa, gestione scontrino dinamico e scansione rapida barcode/EAN con feedback acustico.
-- **Anagrafica Clienti & Fidelity**: Gestione clienti con tracciamento storico acquisti, accumulo punti e fidelity card.
-- **Modulo Documenti & Movimenti**: Registro storico degli scontrini emessi con dettaglio riga e modalità di pagamento.
-- **Ristrutturazione Database**: Schema SQLite espanso per includere clienti, storico movimenti di banco e log di audit.
-- **Build Pipeline & Installer**: Creazione dello script batch di build (`build_exe.bat`) e dello script Inno Setup (`setup_script.iss`) per pacchettizzare la versione eseguibile Windows.
+Fase di stabilizzazione: risoluzione bug bloccanti, allineamento schema database, coerenza fiscale tra moduli, packaging per la distribuzione.
+
+### 🐛 Corretto
+
+#### Architettura & avvio
+- **Fix `ModuleNotFoundError`**: rimossi tutti gli import con prefisso `src.` all'interno di `src/modules/` e `src/config.py`. Ora tutti i moduli interni usano import diretti (`from database import ...`) per garantire compatibilità con l'esecuzione da sorgente.
+- **Fix `NameError: current_dir`** con VS Code Code Runner: identificato il problema legato ai file temporanei (`tempCodeRunnerFile.py`) e stabilizzato l'avvio tramite terminale integrato con `python src/main.py`.
+- **Fix "limbo" del SetupWizard**: il wizard di primo avvio non rilasciava correttamente il `grab_set()` prima di chiamare `destroy()`, causando il blocco dell'event loop. Aggiunto `grab_release()` esplicito e rimandata la costruzione dell'interfaccia con `after_idle()`.
+- **Fix popup a cascata all'avvio**: `get_company_data()` mascherava tutti gli errori restituendo `None`, causando la riapertura del wizard anche quando il problema era un DB corrotto o lockato. Ora `None` viene restituito solo se la tabella `impostazioni_azienda` non esiste; tutti gli altri errori vengono rilanciati e loggati.
+- **Fix `grab_set` su finestre modali**: nei form di `clienti.py`, `fornitori.py`, `magazzino.py` il `grab_set()` viene ora chiamato dopo `wait_visibility()`, evitando grab "fantasma" su widget non ancora visibili.
+- **Aggiunto handler `WM_DELETE_WINDOW`** su `MercurioApp` per chiusura pulita dell'app e flush del log.
+
+#### Schema database e migrazioni
+- **Fix `no such column: iban`, `scorta_minima`, `fornitore_id`, `metodo_pagamento`**: aggiunta una logica robusta di migrazione automatica con `PRAGMA table_info` + `ALTER TABLE` in `database.py` per aggiornare DB esistenti senza perdita di dati.
+- **Aggiunte 3 colonne mancanti a `fornitori`**: `codice_univoco` (SDI), `istituto_bancario`, `metodo_pagamento`. Necessarie per il corretto funzionamento di `fornitori.py`.
+- **Aggiunte `iva_4` ed `esente` in migrazione** per `corrispettivi_giornalieri`, coerentemente con il `CREATE TABLE`.
+- **Fix `DB_PATH`** con `os.path.abspath(os.path.normpath(...))`: path assoluto e normalizzato, indipendente dalla CWD.
+- **Fix `PRAGMA foreign_keys = ON`** in `get_connection()`: coerenza referenziale tra `fornitore_id`, `articolo_id`, `cliente_id`.
+- **Aggiunto `DB_TIMEOUT = 10.0`** in `get_connection()`: evita "database is locked" in caso di concorrenza.
+- **Fix path `%LOCALAPPDATA%` per l'exe**: `database.py` ora distingue `sys.frozen` e usa `%LOCALAPPDATA%\MercurioGestionale\gestionale.db` quando compilato con PyInstaller, evitando crash per permessi in `C:\Program Files\`.
+
+#### Configurazione aziendale
+- **Fix `save_company_data` non atomica**: aggiunto `try/finally` con `conn.close()` garantito e `conn.rollback()` esplicito in caso di errore.
+- **Fix sovrascrittura dei campi RT/Fidelity**: `save_company_data` ora aggiorna solo i campi effettivamente presenti nel `data`, preservando i default della tabella per i campi non forniti dal wizard.
+- **Fix `esegui_backup_sistema`**: usa lo stesso `DB_PATH` di `database.py`, garantendo backup del file effettivamente usato dall'app.
+- **Aggiunto logging** su tutte le operazioni critiche (salvataggio config, backup, migrazioni).
+
+#### Magazzino
+- **Fix `apri_finestra_articolo`**: la SELECT non viene più costruita da `entries.keys()` (fragile) ma da una lista esplicita `FIELDS_FORM` allineata al DB.
+- **Rimosso blocco su `prezzo_vendita == 0`**: ora permette articoli omaggio/campione, blocca solo prezzi negativi.
+- **Fix rettifica magazzino**: `RETTIFICA` accetta anche `0` (azzeramento giacenza) e rifiuta quantità negative con messaggio chiaro.
+- **Fix import CSV**: validazione riga per riga con conteggio degli scarti, controllo duplicati su `codice_interno` (UNIQUE), riepilogo finale dei motivi di scarto.
+- **Fix `filtra_articoli`**: sostituito `except: pass` con `log.exception`.
+- **Fix gestione `None`** in giacenza/soglia nella visualizzazione tabella.
+
+#### Clienti
+- **Fix `carica_dati`** in `ClienteForm`: SELECT basata su `DB_FIELDS` esplicito, non su `entries.keys()`.
+- **Fix `punti_fidelity` in modifica**: in modalità modifica, i punti vengono esclusi dall'UPDATE se non modificati dall'utente (evita race condition con accrediti dal POS).
+- **Fix validazione `punti_fidelity`**: messaggio chiaro se l'utente scrive un valore non numerico.
+- **Fix `apri_form_modifica` da doppio clic**: ignora silenziosamente il doppio clic su area vuota, evitando popup inutili.
+- **Fix `filtra_clienti`**: usato `COALESCE` per gestire `codice_fiscale`/`partita_iva` NULL.
+- **Fix `except: pass`** in `filtra_clienti`: sostituito con `log.exception`.
+
+#### Fornitori
+- **Fix `carica_fornitori`**: rimosso `metodo_pagamento` non presente nel DB (ora presente dopo la patch).
+- **Fix `elimina_fornitore`**: check preliminare su `articoli.fornitore_id` prima del DELETE, per evitare `FOREIGN KEY constraint failed` con messaggio tecnico.
+- **Fix modulo riordino**: `COALESCE(scorta_minima, soglia_minima, 0)` per essere robusto qualunque sia la colonna popolata da `magazzino.py`.
+- **Fix `except: pass`** in `carica_articoli_sotto_scorta`: sostituito con `log.exception`.
+- **Fix `import csv`**: spostato in cima al modulo.
+
+#### POS (Cassa)
+- **Fix fiscale bloccante**: `pagamento` e `metodo_pagamento` non venivano scritti nella INSERT dello scontrino. Risultato: la chiusura Z vedeva tutti gli scontrini come "pagamento non classificato" e li buttava in "altro". Ora vengono salvati esattamente come `'CONTANTI'` o `'POS'`.
+- **Fix calcolo `imponibile`**: non più `totale / 1.22` fisso, ma calcolato sull'IVA reale di ciascun item del carrello (`_calcola_imponibile`).
+- **Fix IVA degli sconti totali**: gli sconti (`ean == "SCONTO-TOT"`) sono esclusi dal calcolo IVA (non hanno aliquota propria).
+- **Fix `aliquota_iva`**: letta correttamente da `articoli` quando si aggiunge al carrello, non più hardcoded a 22%.
+- **Fix controllo giacenza**: sia all'aggiunta al carrello sia prima di concludere la vendita, con messaggi chiari.
+- **Fix `stato_xml`**: ora `'EMESSO'` invece di `'GENERATO'`, coerente con gli altri moduli.
+- **Fix numerazione scontrino**: timestamp con microsecondi + controllo duplicati per evitare collisioni su scontrini emessi nello stesso secondo.
+- **Fix `_estrai_cliente_id`**: verifica `isdigit()` prima del cast a int, evitando crash se l'utente scrive testo libero nella combo.
+- **Fix `import winsound`**: protetto con `HAS_WINSOUND` per non far crashare il modulo su Linux/macOS.
+- **Fix `except: pass`** in `aggiorna_combos_clienti` e `cerca_cliente_rapido`: sostituiti con `log.exception`.
+
+#### Documenti fiscali
+- **Fix annullo scontrino**: controllo `stato_xml == 'ANNULLATO_RT'` per evitare annulli doppi (che genererebbero storni negativi multipli).
+- **Fix fattura da scontrino**: controlli di validità (scontrino annullato, fattura già emessa, imponibile NULL) prima della INSERT.
+- **Fix duplicati numero fattura**: controllo preliminare su `numero` prima della INSERT.
+- **Fix `datetime('now')`**: sostituito con `datetime('now','localtime')` per rispettare il fuso orario italiano (fondamentale per la datazione fiscale).
+- **Fix warning fattura su scontrino annullato**: chiede conferma esplicita all'utente (l'annullo RT non sostituisce una nota di credito).
+- **Fix `except: pass`** in `genera_fattura_da_scontrino`: sostituito con `log.exception`.
+
+#### Corrispettivi (Chiusura Z)
+- **Fix inclusione annulli**: la chiusura Z ora include gli `ANNULLO` (importi negativi) nel totale e nella ripartizione contanti/POS, ed esclude gli `SCONTRINO` con `stato_xml = 'ANNULLATO_RT'` (già compensati).
+- **Fix contanti/POS reali**: la ripartizione non è più inventata (70%/30%) ma letta dai `documenti` con `SUM(CASE WHEN pagamento = 'CONTANTI' ...)`.
+- **Fix conteggio scontrini**: `num_scontrini` conta solo scontrini validi (non annullati); `num_annulli` viene tracciato separatamente.
+- **Fix IVA**: warning se ci sono scontrini con `imponibile IS NULL` (dati legacy).
+- **Rimosso `CREATE TABLE` ridondante**: la tabella è già creata da `init_db()` in `database.py`, non va ricreata nel modulo.
+- **Fix transazione atomica**: DELETE + INSERT in un'unica transazione con `commit()` finale, `rollback()` esplicito in caso di errore.
+- **Aggiunto logging** su tutte le operazioni.
+
+#### Impostazioni
+- **Fix `civico`**: aggiunto al form (era assente, impediva di modificare il campo).
+- **Fix validazione `rt_porta` / `rt_baudrate`**: interi validati separatamente con messaggio chiaro per campo.
+- **Fix validazione Fidelity**: float validati separatamente, messaggio chiaro invece del generico "could not convert".
+- **Fix ricarica dopo salvataggio**: `carica_dati()` viene richiamato dopo un salvataggio riuscito, per allineare i campi al DB (es. float normalizzati).
+- **Fix `except: pass`** in `carica_dati`: sostituito con `log.exception`.
+
+#### Dashboard
+- **Fix KPI sottoscorta**: usa `COALESCE(scorta_minima, soglia_minima, 0)`, allineato al modulo riordino.
+- **Fix `except: pass`** per singolo KPI: sostituito con `log.warning` specifico per ogni query.
+
+### 📦 Packaging & distribuzione
+
+- **Aggiunto `requirements.txt`**: nessuna dipendenza runtime (solo standard library).
+- **Aggiunto `requirements-dev.txt`**: solo `pyinstaller>=6.0` per la build.
+- **Aggiunto `build.bat`**: script di automazione build con verifica prerequisiti (Python, `icona.ico`, `setup_script.iss`), pulizia cartelle, PyInstaller con `--clean`, Inno Setup 6.
+- **Aggiunto `setup_script.iss`**: script Inno Setup allineato al nome exe `MercurioGestionale.exe`, rimosso blocco `[Icons]` duplicato, aggiunto `[Code]` con `taskkill` per chiudere eventuali istanze aperte prima dell'installazione.
+- **Aggiunto `CHANGELOG.md`** (questo file).
+- **Aggiunto `LICENSE`** (GPL v3).
+
+### 🔧 Migliorato
+
+- **Logging strutturato**: aggiunto logger `mercurio.*` per ogni modulo, con formato `[%(asctime)s] [%(levelname)s] %(name)s: %(message)s`, output su file (`mercurio.log`) e console.
+- **Gestione errori UI**: `MercurioApp._add_tab` cattura eccezioni di caricamento moduli e mostra un riquadro rosso nella tab invece di un popup bloccante. Traceback completo nel log.
+- **Robustezza connessioni**: `try/finally` con `conn.close()` garantito in tutti i moduli.
+- **Coerenza fiscale POS → Documenti → Corrispettivi**: il flusso di vendita, annullo, chiusura Z ora è coerente e i totali tornano.
+
+### 📝 Note
+
+- **`scorta_minima` vs `soglia_minima`**: entrambe esistono nello schema. `magazzino.py` scrive `soglia_minima`, il riordino legge `COALESCE(scorta_minima, soglia_minima)`. Per la v0.4.0 si valuterà l'unificazione.
+- **IVA per aliquota**: la chiusura Z attualmente assegna tutta l'IVA a `iva_22` perché `documenti` non ha il dettaglio righe. La ripartizione esatta (22/10/4/esente) richiede una tabella `documenti_righe` prevista per la v0.4.0.
+- **Integrazione RT**: la configurazione IP/Seriale viene salvata in `impostazioni_azienda`, ma l'invio dei comandi al Registratore Telematico non è ancora implementato (previsto v0.4.0).
+- **Fatturazione Elettronica SDI**: i documenti `FATTURA` vengono creati con `stato_xml = 'PRONTO_SDI'` ma non viene generato l'XML FatturaPA né inviato allo SDI (previsto v0.4.0).
 
 ---
 
-## [0.1.0-alpha] - 2026-10-29
+## [Prossime versioni]
 
-### ➕ Aggiunto
-- **Prototipo Iniziale**: Prima bozza dell'interfaccia grafica sviluppata in Python con la libreria `customtkinter`.
-- **Database SQLite**: Struttura iniziale della base dati locale per la gestione dell'anagrafica articoli e delle giacenze di magazzino.
-- **Modulo Magazzino**: Funzionalità base per l'inserimento, la modifica e la ricerca di prodotti e reparti.
-- **Setup iniziale Git**: Creazione della repository GitHub, licenza open-source e configurazione del file `.gitignore`.
+### [v0.4.0] - Pianificata
+
+- Tabella `documenti_righe` per la ripartizione IVA per aliquota.
+- Contatore progressivo scontrini/fatture per anno (invece del timestamp).
+- Unificazione `soglia_minima` / `scorta_minima`.
+- Implementazione integrazione RT (comandi IP/TCP e Seriale XON/XOFF).
+- Generazione XML FatturaPA e predisposizione invio SDI.
+- Backup automatico periodico (oggi solo manuale).
+- Fatturazione elettronica completa.
 
 ---
+
+## [Legenda]
+
+- **Aggiunto**: nuove funzionalità.
+- **Modificato**: modifiche a funzionalità esistenti.
+- **Deprecato**: funzionalità che saranno rimosse.
+- **Rimosso**: funzionalità rimosse.
+- **Corretto**: correzioni di bug.
+- **Sicurezza**: vulnerabilità corrette.
+
+---
+
+**Link di confronto**: 
+- [v0.3.0 Alpha](https://github.com/andreasalerno89/Mercurio-Gestionale-Retail/releases/tag/v0.3.0-alpha)

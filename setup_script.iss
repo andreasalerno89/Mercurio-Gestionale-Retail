@@ -1,24 +1,39 @@
-; Script di installazione per Mercurio Gestionale Retail v0.2.1-alpha
-; Generato per Inno Setup 6
+; Script di configurazione Inno Setup per Mercurio Gestionale Retail v0.3.0 Alpha
+;
+; IMPORTANTE: questo script presuppone che il build_exe.bat usi:
+;   --name "MercurioGestionale"
+; Quindi l'exe generato è: dist\MercurioGestionale\MercurioGestionale.exe
 
-#define MyAppName "Mercurio Gestionale Retail"
-#define MyAppVersion "0.2.1-alpha"
+#define MyAppVersion "0.3.0 Alpha"
+#define MyAppName "Mercurio Gestionale Retail v0.3.0 Alpha"
+#define MyAppShortName "Mercurio Gestionale Retail"
 #define MyAppPublisher "Andrea Salerno"
+#define MyAppURL "https://github.com/andreasalerno89/Mercurio-Gestionale-Retail"
 #define MyAppExeName "MercurioGestionale.exe"
 
 [Setup]
-; Unique App ID per la gestione corretta di disinstallazioni e aggiornamenti
-AppId={{B2D157B5-F832-412E-9C81-839F11E1D942}
+AppId={{A4B3C2D1-E5F6-7890-ABCD-EF1234567890}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppVerName={#MyAppName}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\MercurioRetail
-DefaultGroupName={#MyAppName}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+
+DefaultDirName={autopf}\Mercurio Gestionale Retail
+DefaultGroupName=Mercurio Gestionale Retail
 AllowNoIcons=yes
-; Cartella di output dove Inno Setup salverà il file .exe finale dell'installer
+
+; Rimuovi il commento se hai i file LICENSE e README.md
+; LicenseFile=LICENSE
+; InfoBeforeFile=README.md
+
 OutputDir=Output
-OutputBaseFilename=Setup_Mercurio_Retail_v0.2.1-alpha
-Compression=lzma
+OutputBaseFilename=mercurio_gestionale_retail_v0.3.0-Alpha-Win64-setup
+SetupIconFile=icona.ico
+
+Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 
@@ -29,13 +44,27 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Preleva l'intera cartella generata da PyInstaller (assicurati che il nome corrisponda a dist\MercurioGestionale)
+; Copia l'intera cartella generata da PyInstaller (nome senza spazi)
 Source: "dist\MercurioGestionale\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Copia esplicitamente l'icona nella cartella di installazione (per i collegamenti)
+Source: "icona.ico"; DestDir: "{app}"; Flags: ignoreversion
+
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icona.ico"
+Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppShortName}}"; Filename: "{#MyAppURL}"
+Name: "{group}\{cm:UninstallProgram,{#MyAppShortName}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icona.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppShortName}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// Chiude eventuali istanze di Mercurio in esecuzione prima di installare
+function InitializeSetup(): Boolean;
+var
+  ErrorCode: Integer;
+begin
+  Exec('taskkill', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode);
+  Result := True;
+end;

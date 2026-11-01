@@ -1,25 +1,76 @@
-# Python bytecode e cache
+# Python / Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Directory di build e distribuzione (PyInstaller e Inno Setup)
+.Python
 build/
 dist/
-Output/
 *.spec
 
-# File di configurazione locali o dati sensibili
-config_mercurio.json
+# Inno Setup Output
+Output/
 
-# Editor e IDE (VS Code, PyCharm, ecc.)
+# Database di test locali (mantenere il file di produzione fuori dal repo)
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor / IDE / OS
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Log e file temporanei di sistema
-*.log
+.DS_Store
 Thumbs.db
-desktop.ini
+
+# Log files
+*.log
+
+# Python / Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+dist_build/
+*.spec
+
+# Ambienti virtuali
+.venv/
+venv/
+env/
+ENV/
+
+# Inno Setup Output
+Output/
+*.exe
+
+# Database di test locali (mantenere il file di produzione fuori dal repo)
+*.db
+*.sqlite
+*.sqlite3
+gestionale.db
+gestionale.db-journal
+gestionale.db-wal
+gestionale.db-shm
+
+# Editor / IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Log files
+*.log
+mercurio.log
+
+# File di backup del DB
+*.db.bak
+*.db.old
