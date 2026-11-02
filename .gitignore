@@ -6,35 +6,6 @@ __pycache__/
 .Python
 build/
 dist/
-*.spec
-
-# Inno Setup Output
-Output/
-
-# Database di test locali (mantenere il file di produzione fuori dal repo)
-*.db
-*.sqlite
-*.sqlite3
-
-# Editor / IDE / OS
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# Log files
-*.log
-
-# Python / Bytecode
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
 dist_build/
 *.spec
 
@@ -48,7 +19,7 @@ ENV/
 Output/
 *.exe
 
-# Database di test locali (mantenere il file di produzione fuori dal repo)
+# Database locali (esclusi dal repo; il DB di produzione è fuori)
 *.db
 *.sqlite
 *.sqlite3
