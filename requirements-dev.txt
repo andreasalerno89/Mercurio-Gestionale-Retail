@@ -1,0 +1,4 @@
+# Dipendenze solo per lo sviluppo / build dell'eseguibile.
+# L'app in sé non ne ha bisogno.
+
+pyinstaller>=6.0
