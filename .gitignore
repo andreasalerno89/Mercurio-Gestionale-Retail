@@ -1,0 +1,47 @@
+# Python / Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+dist_build/
+*.spec
+
+# Ambienti virtuali
+.venv/
+venv/
+env/
+ENV/
+
+# Inno Setup Output
+Output/
+*.exe
+
+# Database locali (esclusi dal repo; il DB di produzione è fuori)
+*.db
+*.sqlite
+*.sqlite3
+gestionale.db
+gestionale.db-journal
+gestionale.db-wal
+gestionale.db-shm
+
+# Editor / IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Log files
+*.log
+mercurio.log
+
+# File di backup del DB
+*.db.bak
+*.db.old

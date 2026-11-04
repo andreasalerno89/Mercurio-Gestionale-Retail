@@ -1,4 +1,4 @@
-# Mercurio Gestionale Retail Enterprise
+# Mercurio Gestionale Retail
 #
 # Questo progetto utilizza esclusivamente la libreria standard di Python 3.
 # Non sono necessarie dipendenze esterne di terze parti via pip.
