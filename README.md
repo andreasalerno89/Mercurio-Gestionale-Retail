@@ -28,7 +28,7 @@ Sistema Operativo: Windows 10 / 11 (64-bit)
   - Registrazione scontrini con tracciamento del metodo di pagamento (CONTANTI / POS).
   - Emissione scontrini di annullo (Storno RT) con rettifica automatica dei corrispettivi.
   - Predisposizione per la fatturazione elettronica: creazione di documenti FATTURA con stato PRONTO_SDI e generazione di copie di cortesia.
-  - Configurazione dei parametri di connessione al Registratore Telematico (IP/TCP o Seriale XON/XOFF). L'invio effettivo dei comandi RT è previsto per la v0.4.0.
+  - Configurazione dei parametri di connessione al Registratore Telematico (IP/TCP o Seriale XON/XOFF) e scelta del protocollo RT (XON/XOFF seriale, XON/XOFF TCP, Epson SOAP, RCH nativo, Custom nativo, 3i nativo, ESC/POS). L'invio effettivo dei comandi RT è previsto per la v0.4.0.
 - Corrispettivi & Chiusura Z: chiusura giornaliera con ripartizione Contanti/POS/Altro e calcolo IVA aggregato. Gli scontrini annullati sono esclusi dal conteggio e compensati dallo scontrino di annullo.
 - Backup Integrato: copia di sicurezza manuale del database SQLite nella cartella utente (Documents/MercurioBackup).
 
@@ -48,7 +48,7 @@ Sistema Operativo: Windows 10 / 11 (64-bit)
 ## Installazione & Avvio
 
 Utente finale:
-Scarica l'installer (Output\mercurio_gestionale_retail_v0.3.0-Alpha-Win64-setup.exe) dalla release e installalo. Non servono prerequisiti: l'app è autocontenuta.
+Scarica l'installer (Output\mercurio_gestionale_retail-v0.3.1-alpha-win64-setup.exe) dalla release e installalo. Non servono prerequisiti: l'app è autocontenuta.
 Il database viene creato al primo avvio in: %LOCALAPPDATA%\MercurioGestionale\gestionale.db
 Questo garantisce che l'app funzioni anche installata in C:\Program Files\ senza richiedere privilegi amministrativi.
 
@@ -59,7 +59,7 @@ python src/main.py
 In sviluppo il database viene creato nella root del progetto (gestionale.db). Non è necessaria alcuna installazione di dipendenze.
 
 Build dell'installer:
-build.bat
+build_exe.bat
 Lo script automatizza: pulizia cartelle -> PyInstaller -> Inno Setup. L'output finale è in Output\.
 
 ---
@@ -73,7 +73,7 @@ Gestionale Mercurio Retail/
 ├── requirements.txt             (nessuna dipendenza runtime)
 ├── requirements-dev.txt         (solo per la build: PyInstaller)
 ├── icona.ico
-├── build.bat                    (script di automazione build e Inno Setup)
+├── build_exe.bat                (script di automazione build e Inno Setup)
 ├── setup_script.iss             (script di configurazione per Inno Setup)
 ├── gestionale.db                (DB in sviluppo; in %LOCALAPPDATA% nell'exe)
 ├── mercurio.log                 (log applicativo, generato al primo avvio)
@@ -94,15 +94,15 @@ Gestionale Mercurio Retail/
 
 ## Stato del Progetto
 
-v0.3.0 Alpha - Fase di stabilizzazione. I flussi principali (POS -> Documenti -> Corrispettivi) sono allineati e testati. Le funzionalità di integrazione RT e Fatturazione Elettronica SDI sono predisposte ma non ancora operative: vedi CHANGELOG.md per la roadmap.
+v0.3.1 Alpha - Fondamenta dati completate (Milestone 1). Aggiunte tabelle `contatori` e `documenti_righe`; colonne di collegamento documenti (`scontrino_origine_id`, `documento_origine_id`, `tipo_soggetto`); campo `rt_protocollo` in impostazioni; separazione indirizzo/civico e cap/località nei form; ricerca fornitori; icona finestra. I flussi principali (POS -> Documenti -> Corrispettivi) sono allineati e testati. Le funzionalità di integrazione RT e Fatturazione Elettronica SDI sono predisposte ma non ancora operative: vedi CHANGELOG.md per la roadmap.
 
 Roadmap v0.4.0:
-- Tabella documenti_righe per la ripartizione IVA per aliquota.
-- Contatore progressivo scontrini/fatture per anno.
+- Completare la ripartizione IVA per aliquota usando `documenti_righe`.
 - Unificazione colonne soglia_minima / scorta_minima.
-- Integrazione RT (comandi IP/TCP e Seriale XON/XOFF).
+- Implementazione integrazione RT (comandi IP/TCP e Seriale XON/XOFF).
 - Generazione XML FatturaPA e predisposizione invio SDI.
 - Backup automatico periodico.
+- Porting Linux (WSL Debian, `.deb`, `.tar.gz`, `.rpm`).
 
 ---
 
@@ -118,4 +118,3 @@ Questo programma è distribuito nella speranza che sia utile, ma SENZA ALCUNA GA
 Dovresti aver ricevuto una copia della GNU General Public License insieme a questo programma. Se così non fosse, vedi https://www.gnu.org/licenses/.
 
 Il testo completo della licenza è nel file LICENSE.
-

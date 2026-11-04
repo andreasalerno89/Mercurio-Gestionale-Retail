@@ -6,12 +6,35 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) e il p
 
 ---
 
-## [v0.3.1-alpha] - 2026-03-11
+## [v0.3.1-alpha] - 2026-11-04
 
 ### 🚀 Milestone 1 — Fondamenta Dati
+
+#### Schema database
 - **Aggiunta tabella `contatori`**: per la gestione della numerazione progressiva dei documenti (Scontrini, Fatture, DDT, ecc.) su base annua.
 - **Aggiunta tabella `documenti_righe`**: per gestire il dettaglio delle righe all'interno di ogni documento, consentendo una corretta ripartizione dell'IVA per aliquota.
-- **Aggiornamento `database.py`**: implementata logica di inizializzazione e migrazione per le nuove tabelle.
+- **Aggiunte colonne `scontrino_origine_id`, `documento_origine_id`, `tipo_soggetto`** a `documenti`: per collegare fatture, annulli, note di credito e DDT al documento originale, e per distinguere cliente/occasionale/fidelity.
+- **Aggiunta colonna `rt_protocollo`** a `impostazioni_azienda`: predisposizione per i protocolli RT (`XON_XOFF_SERIALE`, `XON_XOFF_TCP`, `EPSON_SOAP`, `RCH_NATIVO`, `CUSTOM_NATIVO`, `3I_NATIVO`, `ESCPOS`).
+- **Aggiornamento `database.py`**: implementata logica di inizializzazione e migrazione per le nuove tabelle e colonne.
+
+#### Anagrafiche
+- **Separazione indirizzo/civico e cap/località** nei form clienti e fornitori.
+- **Fix `DB_FIELDS` in `clienti.py`**: rimossi duplicati `localita`/`provincia` che causavano disallineamento nella SELECT.
+- **Ricerca testuale nella tab Fornitori**: barra di ricerca per nome, P.IVA o PEC, analoga a quella dei clienti.
+- **Form fornitore**: aggiunti campi `civico` e `cap` separati, altezza form aumentata per ospitare i 14 campi.
+
+#### Impostazioni
+- **Campo `rt_protocollo`**: aggiunto menu a tendina nella tab RT con i 7 protocolli supportati (predisposizione, invio comandi reali previsto per v0.4.0).
+
+#### UI e packaging
+- **Aggiornamento versione a `v0.3.1 Alpha`** in titolo finestra, dashboard e log di avvio.
+- **Icona finestra**: aggiunto `iconbitmap` in `main.py` per mostrare `icona.ico` nella barra del titolo e nella taskbar.
+- **Rimozione "Enterprise"** dal nome software in dashboard, README e `requirements.txt`.
+- **Aggiunti `requirements.txt`** (nessuna dipendenza runtime) e **`requirements-dev.txt`** (solo `pyinstaller>=6.0`).
+- **`.gitignore` aggiornato**: esclusi `.clinerules` e `icona.jpg`.
+
+#### Configurazione
+- **`config.py`**: aggiunto `rt_protocollo` nella lista `fields` di `save_company_data`.
 
 ---
 
