@@ -45,3 +45,6 @@ mercurio.log
 # File di backup del DB
 *.db.bak
 *.db.old
+
+# Configurazioni locali Cline / altri tool
+.clinerules
