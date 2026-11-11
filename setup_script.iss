@@ -2,7 +2,7 @@
 ;
 ; IMPORTANTE: questo script presuppone che il build_exe.bat usi:
 ;   --name "MercurioGestionale"
-; Quindi l'exe generato Ã¨: dist\MercurioGestionale\MercurioGestionale.exe
+; Quindi l'exe generato è: dist\MercurioGestionale\MercurioGestionale.exe
 
 #define MyAppVersion "0.3.1 Alpha"
 #define MyAppName "Mercurio Gestionale Retail v0.3.1 Alpha"

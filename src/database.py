@@ -59,7 +59,7 @@ def init_db():
     try:
         cursor = conn.cursor()
 
-         # 1. Tabella Azienda / Impostazioni Generali e RT
+         # 1. Tabella Azienda/Impostazioni Generali e RT
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS impostazioni_azienda (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,7 +153,7 @@ def init_db():
             )
         """)
 
-        # 5. Tabella Documenti Fiscali (Scontrini, Fatture, DDT, Annulli)
+            # 5. Tabella Documenti Fiscali (Scontrini, Fatture, DDT, Annulli)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documenti (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,6 +171,8 @@ def init_db():
                 scontrino_origine_id INTEGER,
                 documento_origine_id INTEGER,
                 tipo_soggetto TEXT DEFAULT 'OCCASIONALE',
+                motivo_annullo TEXT,
+                riferimento_esterno TEXT,
                 FOREIGN KEY (cliente_id) REFERENCES clienti(id)
             )
         """)
@@ -210,8 +212,27 @@ def init_db():
                 prezzo_unitario REAL,
                 aliquota_iva REAL,
                 totale_riga REAL,
+                sconto_riga REAL DEFAULT 0.0,
+                tipo_sconto_riga TEXT DEFAULT '%',
                 FOREIGN KEY (documento_id) REFERENCES documenti(id),
                 FOREIGN KEY (articolo_id) REFERENCES articoli(id)
+            )
+        """)
+
+                # 8b. Tabella Dati DDT (Documento di Trasporto)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ddt_dati (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                documento_id INTEGER,
+                vettore TEXT,
+                destinatario_indirizzo TEXT,
+                destinatario_cap TEXT,
+                destinatario_localita TEXT,
+                destinatario_provincia TEXT,
+                causale_trasporto TEXT,
+                data_ritiro TEXT,
+                aspettativa TEXT,
+                FOREIGN KEY (documento_id) REFERENCES documenti(id)
             )
         """)
 
@@ -236,12 +257,20 @@ def init_db():
         # MIGRAZIONI AUTOMATICHE PER DB ESISTENTI
         # ==========================================
 
-                # --- documenti ---------------------------------------------------
+                       # --- documenti ---------------------------------------------------
         _safe_add_column(cursor, "documenti", "pagamento", "TEXT")
         _safe_add_column(cursor, "documenti", "metodo_pagamento", "TEXT")
         _safe_add_column(cursor, "documenti", "scontrino_origine_id", "INTEGER")
         _safe_add_column(cursor, "documenti", "documento_origine_id", "INTEGER")
         _safe_add_column(cursor, "documenti", "tipo_soggetto", "TEXT DEFAULT 'OCCASIONALE'")
+        _safe_add_column(cursor, "documenti", "motivo_annullo", "TEXT")
+        _safe_add_column(cursor, "documenti", "riferimento_esterno", "TEXT")
+
+        # --- documenti_righe ---------------------------------------------
+        _safe_add_column(cursor, "documenti_righe", "sconto_riga", "REAL DEFAULT 0.0")
+        _safe_add_column(cursor, "documenti_righe", "tipo_sconto_riga", "TEXT DEFAULT '%'")
+
+        # --- ddt_dati (tabella creata via CREATE TABLE IF NOT EXISTS) ----
 
         # --- impostazioni_azienda ----------------------------------------
         _safe_add_column(cursor, "impostazioni_azienda", "rt_protocollo",

@@ -190,6 +190,7 @@ class PosFrame(tk.Frame):
                   font=("Arial", 10, "bold"),
                   command=lambda: self.concludi_vendita("POS")).pack(
             side="right", expand=True, fill="x", padx=1)
+
     # ------------------------------------------------------------------ #
     # Clienti
     # ------------------------------------------------------------------ #
@@ -727,6 +728,8 @@ class PosFrame(tk.Frame):
         try:
             cliente_id = self._estrai_cliente_id()
             imponibile = self._calcola_imponibile(totale)
+
+            # Controllo giacenza prima di procedere
             for item in self.carrello:
                 if item["id"] is None:
                     continue
@@ -750,6 +753,7 @@ class PosFrame(tk.Frame):
                         f"richiesti {item['quantita']:.1f}.",
                         parent=self)
                     return
+
             conn = conn or get_connection()
             cursor = conn.cursor()
             data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -768,7 +772,37 @@ class PosFrame(tk.Frame):
                   imponibile, totale,
                   metodo_pagamento, metodo_pagamento))
             doc_id = cursor.lastrowid
+
+            # Inserisci le righe del documento in documenti_righe
             for item in self.carrello:
+                if item.get("ean") == "SCONTO-TOT":
+                    continue
+
+                aliquota_num = _parse_aliquota(item.get("iva", "22%"))
+                prezzo_unit = float(item.get("prezzo", 0.0))
+                quantita = float(item.get("quantita", 1.0))
+                totale_riga = float(item.get("totale", 0.0))
+                sconto_val = float(item.get("sconto_val", 0.0))
+                sconto_tipo = item.get("sconto_tipo", "%")
+
+                cursor.execute("""
+                    INSERT INTO documenti_righe
+                        (documento_id, articolo_id, descrizione, quantita,
+                         prezzo_unitario, aliquota_iva, totale_riga,
+                         sconto_riga, tipo_sconto_riga)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    doc_id,
+                    item.get("id"),
+                    item.get("descrizione", ""),
+                    quantita,
+                    prezzo_unit,
+                    aliquota_num,
+                    totale_riga,
+                    sconto_val,
+                    sconto_tipo,
+                ))
+
                 if item["id"]:
                     cursor.execute(
                         "UPDATE articoli SET giacenza = giacenza - ? WHERE id = ?",
@@ -779,6 +813,7 @@ class PosFrame(tk.Frame):
                              riferimento_id)
                         VALUES (?, 'VENDITA', ?, 'Vendita POS', ?)
                     """, (item["id"], item["quantita"], doc_id))
+
             if cliente_id:
                 punti = int(max(0, totale))
                 cursor.execute(
