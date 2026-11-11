@@ -1,11 +1,11 @@
-﻿; Script di configurazione Inno Setup per Mercurio Gestionale Retail v0.3.1 Alpha
+﻿; Script di configurazione Inno Setup per Mercurio Gestionale Retail v0.3.2 Alpha
 ;
 ; IMPORTANTE: questo script presuppone che il build_exe.bat usi:
 ;   --name "MercurioGestionale"
 ; Quindi l'exe generato è: dist\MercurioGestionale\MercurioGestionale.exe
 
-#define MyAppVersion "0.3.1 Alpha"
-#define MyAppName "Mercurio Gestionale Retail v0.3.1 Alpha"
+#define MyAppVersion "0.3.2 Alpha"
+#define MyAppName "Mercurio Gestionale Retail v0.3.2 Alpha"
 #define MyAppShortName "Mercurio Gestionale Retail"
 #define MyAppPublisher "Andrea Salerno"
 #define MyAppURL "https://github.com/andreasalerno89/Mercurio-Gestionale-Retail"
@@ -30,7 +30,7 @@ AllowNoIcons=yes
 ; InfoBeforeFile=README.md
 
 OutputDir=Output
-OutputBaseFilename=mercurio_gestionale_retail-v0.3.1-alpha-Win64-setup
+OutputBaseFilename=mercurio_gestionale_retail-v0.3.2-alpha-win64-setup
 SetupIconFile=icona.ico
 
 Compression=lzma2/max

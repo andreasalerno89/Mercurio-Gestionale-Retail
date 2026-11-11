@@ -223,7 +223,7 @@ class DashboardFrame(tk.Frame):
                  font=("Arial", 12, "bold"), bg="white", fg="#333").pack(anchor="w", pady=(0, 10))
 
         testo_info = (
-            f"• Software: Mercurio Gestionale Retail (v0.3.1 Alpha)\n"
+            f"• Software: Mercurio Gestionale Retail (v0.3.2 Alpha)\n"
             f"• Database: SQLite3 (multi-tabella, pesi, unità di misura, logiche fiscali RT)\n"
             f"• Stato: Pronto per la gestione integrata di magazzino, cassa POS, "
             f"corrispettivi e fatturazione."
@@ -355,7 +355,7 @@ class MercurioApp(tk.Tk):
         except Exception:
             pass
 
-        self.title("Mercurio Gestionale Retail (v0.3.1 Alpha)")
+        self.title("Mercurio Gestionale Retail (v0.3.2 Alpha)")
         self.geometry("1250x780")
         self.minsize(1024, 600)
 

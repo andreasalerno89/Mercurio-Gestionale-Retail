@@ -6,6 +6,37 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) e il p
 
 ---
 
+## [v0.3.2-alpha] - 2026-11-11
+
+### 🚀 Milestone 2 — Gestione Documenti (Parte 1)
+
+#### Schema database
+- **Aggiunte colonne `sconto_riga`, `tipo_sconto_riga`** a `documenti_righe`: per gestire lo sconto applicato alla singola riga (percentuale o valore).
+- **Aggiunte colonne `motivo_annullo`, `riferimento_esterno`** a `documenti`: per motivare annulli/note di credito e collegare documenti esterni.
+- **Aggiunta tabella `ddt_dati`**: per i dati di trasporto dei DDT (vettore, indirizzo destinatario, causale, data ritiro, aspetto esteriore).
+- **Aggiornamento `database.py`**: migrazioni automatiche per le nuove colonne e tabelle.
+
+#### POS (Cassa)
+- **Popolamento `documenti_righe`**: alla conclusione della vendita, le righe del carrello vengono salvate in `documenti_righe` con articolo, quantità, prezzo, aliquota, totale, sconto.
+- **Sconti totali esclusi dalle righe**: gli sconti (`SCONTO-TOT`) non generano righe di dettaglio.
+
+#### Documenti Fiscali
+- **Fattura da scontrino con trasferimento righe**: la fattura creata da uno scontrino ora copia automaticamente tutte le righe in `documenti_righe`.
+- **Numerazione progressiva fatture**: `FAT-2026-0001` da tabella `contatori` (invece di `FAT-2026-{id}`).
+- **Controllo duplicati**: impedisce di fatturare due volte lo stesso scontrino (check su `scontrino_origine_id`).
+- **Note di credito**: nuova finestra `NotaCreditoDialog` con selezione righe, motivo, importi negativi, carico automatico a magazzino (`RESO`).
+- **Numerazione progressiva note di credito**: `NC-2026-0001`.
+- **DDT (Documento di Trasporto)**: nuova finestra `DDTPage` con destinatario, vettore, indirizzo, causale trasporto, data ritiro, aspetto esteriore, selezione articoli.
+- **Numerazione progressiva DDT**: `DDT-2026-0001`.
+- **Copia di cortesia HTML**: sostituito il CSV con un file HTML stampabile in PDF, con intestazione aziendale, dati cliente, tabella righe, riepilogo totali, badge "COPIA DI CORTESIA".
+
+#### UI e packaging
+- **Aggiornamento versione a `v0.3.2 Alpha`** in titolo finestra, dashboard e log di avvio.
+- **Rimosso doppio pulsante "Genera Fattura da Scontrino"**.
+- **README.md e CHANGELOG.md aggiornati** per riflettere le nuove funzionalità.
+
+---
+
 ## [v0.3.1-alpha] - 2026-11-04
 
 ### 🚀 Milestone 1 — Fondamenta Dati
@@ -159,13 +190,14 @@ Fase di stabilizzazione: risoluzione bug bloccanti, allineamento schema database
 
 ### [v0.4.0] - Pianificata
 
-- Tabella `documenti_righe` per la ripartizione IVA per aliquota.
-- Contatore progressivo scontrini/fatture per anno (invece del timestamp).
-- Unificazione `soglia_minima` / `scorta_minima`.
-- Implementazione integrazione RT (comandi IP/TCP e Seriale XON/XOFF).
+- Fattura accompagnatoria (fattura + DDT in un unico documento).
+- Annullo documento con reso (per fatture, note di credito, DDT).
 - Generazione XML FatturaPA e predisposizione invio SDI.
-- Backup automatico periodico (oggi solo manuale).
-- Fatturazione elettronica completa.
+- Apertura cassetto RT (XON/XOFF seriale e TCP).
+- Completare la ripartizione IVA per aliquota usando `documenti_righe`.
+- Unificazione `soglia_minima` / `scorta_minima`.
+- Backup automatico periodico.
+- Porting Linux (WSL Debian, `.deb`, `.tar.gz`, `.rpm`).
 
 ---
 
@@ -181,4 +213,5 @@ Fase di stabilizzazione: risoluzione bug bloccanti, allineamento schema database
 ---
 
 **Link di confronto**: 
+- [v0.3.1 Alpha](https://github.com/andreasalerno89/Mercurio-Gestionale-Retail/releases/tag/v0.3.1-alpha)
 - [v0.3.0 Alpha](https://github.com/andreasalerno89/Mercurio-Gestionale-Retail/releases/tag/v0.3.0-alpha)

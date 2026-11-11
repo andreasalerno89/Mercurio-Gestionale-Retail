@@ -21,7 +21,7 @@ SETLOCAL EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo =================================================================
-echo     MERCURIO GESTIONALE RETAIL v0.3.1-alpha (Build ^& Setup Automation)
+echo     MERCURIO GESTIONALE RETAIL v0.3.2-alpha (Build ^& Setup Automation)
 echo =================================================================
 echo.
 
@@ -109,7 +109,7 @@ echo.
 :: [4/4] Completamento
 echo =================================================================
 echo     PROCESSO COMPLETATO CON SUCCESSO!
-echo     L'installer e' pronto in: Output\mercurio_gestionale_retail-v0.3.1-alpha-win64-setup.exe
+echo     L'installer e' pronto in: Output\mercurio_gestionale_retail-v0.3.2-alpha-win64-setup.exe
 echo =================================================================
 goto end
 
