@@ -1,11 +1,11 @@
-﻿; Script di configurazione Inno Setup per Mercurio Gestionale Retail v0.3.2 Alpha
+﻿; Script di configurazione Inno Setup per Mercurio Gestionale Retail v0.3.3 Alpha
 ;
 ; IMPORTANTE: questo script presuppone che il build_exe.bat usi:
 ;   --name "MercurioGestionale"
 ; Quindi l'exe generato è: dist\MercurioGestionale\MercurioGestionale.exe
 
-#define MyAppVersion "0.3.2 Alpha"
-#define MyAppName "Mercurio Gestionale Retail v0.3.2 Alpha"
+#define MyAppVersion "0.3.3 Alpha"
+#define MyAppName "Mercurio Gestionale Retail v0.3.3 Alpha"
 #define MyAppShortName "Mercurio Gestionale Retail"
 #define MyAppPublisher "Andrea Salerno"
 #define MyAppURL "https://github.com/andreasalerno89/Mercurio-Gestionale-Retail"
@@ -30,7 +30,7 @@ AllowNoIcons=yes
 ; InfoBeforeFile=README.md
 
 OutputDir=Output
-OutputBaseFilename=mercurio_gestionale_retail-v0.3.2-alpha-win64-setup
+OutputBaseFilename=mercurio_gestionale_retail-v0.3.3-alpha-win64-setup
 SetupIconFile=icona.ico
 
 Compression=lzma2/max
@@ -44,10 +44,7 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Copia l'intera cartella generata da PyInstaller (nome senza spazi)
 Source: "dist\MercurioGestionale\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; Copia esplicitamente l'icona nella cartella di installazione (per i collegamenti)
 Source: "icona.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -60,7 +57,6 @@ Name: "{autodesktop}\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"; Icon
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppShortName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// Chiude eventuali istanze di Mercurio in esecuzione prima di installare
 function InitializeSetup(): Boolean;
 var
   ErrorCode: Integer;

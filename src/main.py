@@ -46,7 +46,7 @@ class SetupWizard(tk.Toplevel):
 
     def __init__(self, parent, on_complete_callback):
         super().__init__(parent)
-        self.title("Mercurio Gestionale Retail - Configurazione Iniziale")
+        self.title("Mercurio Gestionale Retail (v0.3.3 Alpha)")
         self.geometry("520x620")
         self.resizable(False, False)
         self.on_complete_callback = on_complete_callback
@@ -223,7 +223,7 @@ class DashboardFrame(tk.Frame):
                  font=("Arial", 12, "bold"), bg="white", fg="#333").pack(anchor="w", pady=(0, 10))
 
         testo_info = (
-            f"• Software: Mercurio Gestionale Retail (v0.3.2 Alpha)\n"
+            f"• Software: Mercurio Gestionale Retail (v0.3.3 Alpha)\n"
             f"• Database: SQLite3 (multi-tabella, pesi, unità di misura, logiche fiscali RT)\n"
             f"• Stato: Pronto per la gestione integrata di magazzino, cassa POS, "
             f"corrispettivi e fatturazione."
@@ -354,13 +354,23 @@ class MercurioApp(tk.Tk):
             self.iconbitmap(icon_path)
         except Exception:
             pass
-
-        self.title("Mercurio Gestionale Retail (v0.3.2 Alpha)")
-        self.geometry("1250x780")
+            self.title("Mercurio Gestionale Retail (v0.3.3 Alpha)")
         self.minsize(1024, 600)
+
+        # Massimizza la finestra all'avvio (Windows: zoom, Linux/Mac: attributi)
+        try:
+            self.state("zoomed")  # Windows
+        except tk.TclError:
+            try:
+                self.attributes("-zoomed", True)  # Linux (alcuni WM)
+            except tk.TclError:
+                self.geometry("1250x780")  # Fallback
 
         # Chiudi in modo pulito: nessuna risorsa resta appesa
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+                # F11 per passare da finestra a fullscreen
+        self.bind("<F11>", self.toggle_fullscreen)
+        self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
 
         log.info("Avvio applicazione Mercurio Gestionale Retail...")
         company_data = get_company_data()
@@ -448,6 +458,23 @@ class MercurioApp(tk.Tk):
                 log.error("Modulo critico '%s' non caricato: l'app resta avviata "
                           "ma la funzionalità è assente.", title)
             return None
+
+    def toggle_fullscreen(self, event=None):
+        """Passa da finestra a fullscreen e viceversa."""
+        is_fullscreen = self.attributes("-fullscreen")
+        self.attributes("-fullscreen", not is_fullscreen)
+        if not is_fullscreen:
+            # Entrando in fullscreen, rimuovi il massimizzato (se presente)
+            try:
+                self.state("normal")
+            except tk.TclError:
+                pass
+        else:
+            # Uscendo da fullscreen, torna massimizzato
+            try:
+                self.state("zoomed")
+            except tk.TclError:
+                pass
 
     def on_close(self):
         log.info("Chiusura applicazione.")

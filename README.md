@@ -1,8 +1,8 @@
-# Mercurio Gestionale Retail v0.3.2 Alpha
+# Mercurio Gestionale Retail v0.3.3 Alpha
 
 Software gestionale open-source per il commercio al dettaglio: Touch-screen POS, Gestione Magazzino avanzata e Fiscalità Italiana RT/SDI.
 
-Versione: v0.3.2 Alpha
+Versione: v0.3.3 Alpha
 Licenza: GNU General Public License v3.0
 Python: 3.9+
 GUI: Tkinter
@@ -51,12 +51,12 @@ Sistema Operativo: Windows 10 / 11 (64-bit)
 
 ## Installazione & Avvio
 
-Utente finale:
-Scarica l'installer (`Output\mercurio_gestionale_retail-v0.3.2-alpha-Win64-setup.exe`) dalla release e installalo. Non servono prerequisiti: l'app è autocontenuta.
+**Utente finale:**
+Scarica l'installer (`Output\mercurio_gestionale_retail-v0.3.3-alpha-win64-setup.exe`) dalla release e installalo. Non servono prerequisiti: l'app è autocontenuta.
 Il database viene creato al primo avvio in: `%LOCALAPPDATA%\MercurioGestionale\gestionale.db`
 Questo garantisce che l'app funzioni anche installata in `C:\Program Files\` senza richiedere privilegi amministrativi.
 
-Sviluppo:
+**Sviluppo:**
 ```bash
 git clone https://github.com/andreasalerno89/Mercurio-Gestionale-Retail.git
 cd Mercurio-Gestionale-Retail
@@ -70,7 +70,7 @@ build_exe.bat
 Lo script automatizza: pulizia cartelle -> PyInstaller -> Inno Setup. L'output finale è in Output\.
 
 Struttura del Progetto
-text
+
 Gestionale Mercurio Retail/
 ├── CHANGELOG.md
 ├── LICENSE
@@ -89,19 +89,27 @@ Gestionale Mercurio Retail/
     └── modules/
         ├── clienti.py           (anagrafica clienti e Fidelity Card)
         ├── corrispettivi.py     (chiusure di cassa Z)
-        ├── documenti.py         (gestione documenti, fatture, note di credito, DDT)
+        ├── documenti.py         (aggregatore moduli documenti)
+        ├── documenti_tab.py     (tabella e pulsanti documenti)
+        ├── ddt.py               (finestra DDT)
+        ├── nota_credito.py      (finestra nota di credito)
+        ├── fattura_manual.py    (finestra fattura manuale)
         ├── fornitori.py         (anagrafica fornitori e modulo riordino)
         ├── impostazioni.py      (pannello di configurazione globale)
         ├── magazzino.py         (gestione articoli, giacenze e CSV)
         └── pos.py               (interfaccia Cassa Touch/POS)
+
 Stato del Progetto
-v0.3.2 Alpha - Milestone 2 in corso (Parte 1: Documenti). Sono state implementate: fattura da scontrino con trasferimento righe, note di credito con carico automatico a magazzino, DDT con dati di trasporto, copia di cortesia HTML stampabile in PDF. I flussi principali (POS -> Documenti -> Corrispettivi) sono allineati e testati. Le funzionalità di integrazione RT e Fatturazione Elettronica SDI sono predisposte ma non ancora operative: vedi CHANGELOG.md per la roadmap.
+
+v0.3.3 Alpha - Milestone 2 in corso. Sono state implementate: fattura manuale (creazione da zero, bozza, emissione, archivio con filtri), fattura da scontrino con trasferimento righe, note di credito con carico automatico a magazzino, DDT con dati di trasporto, copia di cortesia HTML stampabile in PDF. I flussi principali (POS -> Documenti -> Corrispettivi) sono allineati e testati. Le funzionalità di integrazione RT e Fatturazione Elettronica SDI sono predisposte ma non ancora operative: vedi CHANGELOG.md per la roadmap.
 
 Roadmap v0.4.0:
 
 Fattura accompagnatoria (fattura + DDT in un unico documento).
 
 Annullo documento con reso (per fatture, note di credito, DDT).
+
+Fatture passive (import CSV/XML da fornitori).
 
 Generazione XML FatturaPA e predisposizione invio SDI.
 

@@ -4,6 +4,31 @@ Tutte le modifiche rilevanti a questo progetto sono documentate in questo file.
 
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) e il progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/).
 
+## [v0.3.3-alpha] - 2026-11-24
+
+### 🚀 Milestone 2.1 — Fattura Manuale e Archivio
+
+#### Nuove funzionalità
+- **Fattura manuale**: nuova finestra `FatturaManualDialog` per creare fatture da zero, senza passare dallo scontrino.
+- **Cliente censito o occasionale**: la fattura può essere intestata a un cliente censito (precompilazione automatica di indirizzo, CF, P.IVA) o a un cliente occasionale (campi liberi).
+- **Righe fattura**: articoli da magazzino (con precompilazione di prezzo e IVA) o righe libere (descrizione, quantità, prezzo, IVA, sconto % o €).
+- **Metodo di pagamento**: contanti, POS, bonifico immediato, bonifico differito (con IBAN e scadenza).
+- **Stato bozza/emesso**: la fattura può essere salvata come bozza (modificabile) o emessa subito (numero progressivo assegnato).
+- **Archivio con filtri**: la tabella documenti ora ha filtri per tipo, stato e cliente.
+
+#### Refactoring
+- **Divisione di `documenti.py`** in file più piccoli:
+  - `documenti_tab.py`: tabella, filtri e pulsanti.
+  - `ddt.py`: finestra DDT.
+  - `nota_credito.py`: finestra nota di credito.
+  - `fattura_manual.py`: finestra fattura manuale.
+  - `documenti.py`: solo aggregatore (import).
+- **Nuove colonne `stato_documento` e `note`** in `documenti`: `BOZZA`/`EMESSO`/`ANNULLATO`, indipendenti dallo stato SDI.
+- **Massimizzazione finestra all'avvio** + `F11` per fullscreen, per evitare che i pulsanti vengano tagliati.
+
+#### Test
+- **Test di regressione** `test_milestone2_1.py`: verifica schema, creazione bozza, modifica, emissione, eliminazione.
+
 ---
 
 ## [v0.3.2-alpha] - 2026-11-11

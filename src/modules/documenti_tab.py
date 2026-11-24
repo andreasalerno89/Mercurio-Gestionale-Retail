@@ -1,0 +1,623 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import logging
+from datetime import datetime
+
+from database import get_connection
+from modules.ddt import DDTPage
+from modules.nota_credito import NotaCreditoDialog
+
+log = logging.getLogger("mercurio.documenti")
+
+
+class DocumentiManagerTab(tk.Frame):
+    """Modulo di gestione Documenti Fiscali: Scontrini, Fatture, Copie di Cortesia
+    e Annulli RT."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.create_widgets()
+        self.carica_documenti()
+
+    def create_widgets(self):
+        top_frame = tk.Frame(self, padx=10, pady=10)
+        top_frame.pack(fill="x")
+
+        tk.Label(top_frame, text="🧾 Gestione Documenti, Scontrini & Fatture",
+                 font=("Arial", 12, "bold")).pack(side="left")
+
+        tk.Button(top_frame, text="📄 Genera Fattura da Scontrino",
+                  bg="#28a745", fg="white", font=("Arial", 9, "bold"),
+                  command=self.genera_fattura_da_scontrino).pack(side="right", padx=3)
+
+        tk.Button(top_frame, text="↩️ Emetti Nota di Credito",
+                  bg="#fd7e14", fg="white", font=("Arial", 9, "bold"),
+                  command=self.emetti_nota_credito).pack(side="right", padx=3)
+
+        tk.Button(top_frame, text="🚚 Emetti DDT",
+                  bg="#e83e8c", fg="white", font=("Arial", 9, "bold"),
+                  command=self.emetti_ddt).pack(side="right", padx=3)
+
+        tk.Button(top_frame, text="📥 Copia di Cortesia (HTML/PDF)",
+                  bg="#17a2b8", fg="white", font=("Arial", 9, "bold"),
+                  command=self.esporta_copia_cortesia).pack(side="right", padx=3)
+
+        tk.Button(top_frame, text="❌ Scontrino di Annullo (Storno RT)",
+                  bg="#dc3545", fg="white", font=("Arial", 9, "bold"),
+                  command=self.annulla_scontrino).pack(side="right", padx=3)
+
+        tk.Button(top_frame, text="🔄 Aggiorna",
+                  bg="#ffc107", fg="black", font=("Arial", 9, "bold"),
+                  command=self.carica_documenti).pack(side="right", padx=3)
+
+        table_frame = tk.Frame(self, padx=10, pady=5)
+        table_frame.pack(fill="both", expand=True)
+
+        columns = ("id", "tipo", "numero", "data", "cliente",
+                   "totale", "pagamento", "stato_xml")
+        self.tree = ttk.Treeview(table_frame, columns=columns,
+                                 show="headings", selectmode="browse")
+
+        self.tree.heading("id", text="ID")
+        self.tree.heading("tipo", text="Tipo Doc.")
+        self.tree.heading("numero", text="N. Doc")
+        self.tree.heading("data", text="Data Emissione")
+        self.tree.heading("cliente", text="Cliente Associato")
+        self.tree.heading("totale", text="Totale (€)")
+        self.tree.heading("pagamento", text="Pagamento")
+        self.tree.heading("stato_xml", text="Stato SDI / RT")
+
+        self.tree.column("id", width=40, anchor="center")
+        self.tree.column("tipo", width=95, anchor="center")
+        self.tree.column("numero", width=90, anchor="center")
+        self.tree.column("data", width=130, anchor="center")
+        self.tree.column("cliente", width=180, anchor="w")
+        self.tree.column("totale", width=90, anchor="e")
+        self.tree.column("pagamento", width=90, anchor="center")
+        self.tree.column("stato_xml", width=120, anchor="center")
+
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical",
+                                  command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def carica_documenti(self):
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT d.id, d.tipo_documento, d.numero, d.data_emissione,
+                       COALESCE(c.ragione_sociale, 'Cliente Anonimo / Banco') AS cliente,
+                       d.totale_documento, d.pagamento, d.stato_xml
+                FROM documenti d
+                LEFT JOIN clienti c ON d.cliente_id = c.id
+                ORDER BY d.id DESC
+            """)
+            rows = cursor.fetchall()
+
+            for r in rows:
+                formatted_row = (
+                    r[0],
+                    r[1],
+                    r[2] or f"DOC-{r[0]}",
+                    r[3],
+                    r[4],
+                    f"€ {r[5]:.2f}" if r[5] is not None else "€ 0.00",
+                    r[6] or "CONTANTI",
+                    r[7] or "EMESSO",
+                )
+                self.tree.insert("", "end", values=formatted_row)
+        except Exception as e:
+            log.exception("Errore caricamento documenti")
+            messagebox.showerror("Errore",
+                                 f"Impossibile caricare i documenti: {e}",
+                                 parent=self)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    def genera_fattura_da_scontrino(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning(
+                "Attenzione",
+                "Seleziona uno scontrino dalla tabella per generare la fattura corrispondente.",
+                parent=self)
+            return
+
+        item_values = self.tree.item(selected[0], "values")
+        doc_id = item_values[0]
+        tipo = item_values[1]
+
+        if tipo != "SCONTRINO":
+            messagebox.showwarning(
+                "Attenzione",
+                "Puoi generare una fattura solo partendo da uno Scontrino di vendita al banco.",
+                parent=self)
+            return
+
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT cliente_id, imponibile, totale_documento,
+                       pagamento, stato_xml
+                FROM documenti WHERE id = ?
+            """, (doc_id,))
+            scontrino = cursor.fetchone()
+
+            if not scontrino:
+                messagebox.showerror("Errore", "Documento non trovato.",
+                                     parent=self)
+                return
+
+            if not scontrino["cliente_id"]:
+                messagebox.showerror(
+                    "Errore",
+                    "Lo scontrino selezionato non ha un cliente associato. "
+                    "Associa un cliente prima di emettere la fattura.",
+                    parent=self)
+                return
+
+            if scontrino["stato_xml"] == "ANNULLATO_RT":
+                messagebox.showerror("Errore",
+                                     "Impossibile fatturare uno scontrino annullato.",
+                                     parent=self)
+                return
+
+            if scontrino["imponibile"] is None:
+                messagebox.showerror(
+                    "Errore",
+                    "Lo scontrino non ha un imponibile valido: "
+                    "impossibile generare la fattura.",
+                    parent=self)
+                return
+
+            cursor.execute("""
+                SELECT id FROM documenti
+                WHERE tipo_documento = 'FATTURA' AND scontrino_origine_id = ?
+            """, (doc_id,))
+            if cursor.fetchone() is not None:
+                messagebox.showerror(
+                    "Errore",
+                    "Esiste già una fattura collegata a questo scontrino.",
+                    parent=self)
+                return
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM documenti_righe WHERE documento_id = ?",
+                (doc_id,))
+            n_righe = cursor.fetchone()[0] or 0
+            if n_righe == 0:
+                messagebox.showerror(
+                    "Errore",
+                    "Lo scontrino non ha righe di dettaglio: "
+                    "impossibile generare la fattura.",
+                    parent=self)
+                return
+
+            anno_corrente = datetime.now().strftime('%Y')
+            cursor.execute("""
+                SELECT ultimo_numero FROM contatori
+                WHERE tipo_documento = 'FATTURA' AND anno = ?
+            """, (anno_corrente,))
+            row_cnt = cursor.fetchone()
+            if row_cnt is None:
+                nuovo_numero = 1
+                cursor.execute("""
+                    INSERT INTO contatori (tipo_documento, anno, ultimo_numero)
+                    VALUES ('FATTURA', ?, ?)
+                """, (anno_corrente, nuovo_numero))
+            else:
+                nuovo_numero = (row_cnt["ultimo_numero"] or 0) + 1
+                cursor.execute("""
+                    UPDATE contatori SET ultimo_numero = ?
+                    WHERE tipo_documento = 'FATTURA' AND anno = ?
+                """, (nuovo_numero, anno_corrente))
+            numero_fattura = f"FAT-{anno_corrente}-{nuovo_numero:04d}"
+
+            cursor.execute("""
+                INSERT INTO documenti
+                    (tipo_documento, numero, data_emissione, cliente_id,
+                     imponibile, totale_documento, stato_xml, pagamento,
+                     scontrino_origine_id, tipo_soggetto, stato_documento)
+                VALUES ('FATTURA', ?, datetime('now','localtime'), ?, ?, ?,
+                        'PRONTO_SDI', ?, ?, 'CLIENTE', 'EMESSO')
+            """, (
+                numero_fattura,
+                scontrino["cliente_id"],
+                scontrino["imponibile"],
+                scontrino["totale_documento"],
+                scontrino["pagamento"],
+                doc_id,
+            ))
+            fattura_id = cursor.lastrowid
+
+            cursor.execute("""
+                INSERT INTO documenti_righe
+                    (documento_id, articolo_id, descrizione, quantita,
+                     prezzo_unitario, aliquota_iva, totale_riga,
+                     sconto_riga, tipo_sconto_riga)
+                SELECT ?, articolo_id, descrizione, quantita,
+                       prezzo_unitario, aliquota_iva, totale_riga,
+                       sconto_riga, tipo_sconto_riga
+                FROM documenti_righe
+                WHERE documento_id = ?
+            """, (fattura_id, doc_id))
+
+            conn.commit()
+            self.carica_documenti()
+            messagebox.showinfo(
+                "Successo",
+                f"Fattura {numero_fattura} generata con successo "
+                f"dallo scontrino #{doc_id}!\n"
+                f"Righe trasferite: {n_righe}",
+                parent=self)
+        except Exception as e:
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            log.exception("Errore generazione fattura da scontrino id=%s", doc_id)
+            messagebox.showerror("Errore",
+                                 f"Impossibile generare la fattura: {e}",
+                                 parent=self)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    def emetti_nota_credito(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning(
+                "Attenzione",
+                "Seleziona una fattura dalla tabella per emettere la nota di credito.",
+                parent=self)
+            return
+
+        item_values = self.tree.item(selected[0], "values")
+        doc_id = item_values[0]
+        tipo = item_values[1]
+        numero = item_values[2]
+
+        if tipo != "FATTURA":
+            messagebox.showwarning(
+                "Attenzione",
+                "La nota di credito può essere emessa solo su una FATTURA.\n"
+                "Per stornare uno scontrino, usa l'annullo RT.",
+                parent=self)
+            return
+
+        NotaCreditoDialog(self, doc_id, numero, callback=self.carica_documenti)
+
+    def emetti_ddt(self):
+        DDTPage(self, callback=self.carica_documenti)
+
+    def esporta_copia_cortesia(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning(
+                "Attenzione",
+                "Seleziona un documento dalla tabella per esportare la copia di cortesia.",
+                parent=self)
+            return
+
+        item_values = self.tree.item(selected[0], "values")
+        doc_id = item_values[0]
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".html",
+            filetypes=[("HTML Files", "*.html"), ("All Files", "*.*")],
+            title="Esporta Copia di Cortesia",
+        )
+        if not file_path:
+            return
+
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM impostazioni_azienda LIMIT 1")
+            az_row = cursor.fetchone()
+            az = dict(az_row) if az_row else {}
+
+            cursor.execute("""
+                SELECT d.tipo_documento, d.numero, d.data_emissione,
+                       d.imponibile, d.totale_documento, d.pagamento,
+                       d.stato_xml,
+                       COALESCE(c.ragione_sociale, 'Cliente Occasionale') AS cliente_nome,
+                       c.codice_fiscale, c.partita_iva,
+                       c.indirizzo, c.civico, c.cap, c.localita, c.provincia
+                FROM documenti d
+                LEFT JOIN clienti c ON d.cliente_id = c.id
+                WHERE d.id = ?
+            """, (doc_id,))
+            doc = cursor.fetchone()
+
+            if not doc:
+                messagebox.showerror("Errore", "Documento non trovato.",
+                                     parent=self)
+                return
+
+            cursor.execute("""
+                SELECT descrizione, quantita, prezzo_unitario, aliquota_iva,
+                       totale_riga, sconto_riga, tipo_sconto_riga
+                FROM documenti_righe
+                WHERE documento_id = ?
+                ORDER BY id ASC
+            """, (doc_id,))
+            righe = cursor.fetchall()
+
+            def esc(s):
+                if s is None:
+                    return ""
+                return (str(s).replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace('"', "&quot;"))
+
+            html = []
+            html.append("<!DOCTYPE html>")
+            html.append("<html lang='it'>")
+            html.append("<head>")
+            html.append("<meta charset='UTF-8'>")
+            html.append(f"<title>Copia di Cortesia - {esc(doc['numero'])}</title>")
+            html.append("<style>")
+            html.append("body { font-family: Arial, sans-serif; margin: 30px; color: #333; }")
+            html.append("h1 { font-size: 18px; margin: 0 0 5px 0; }")
+            html.append(".header { border-bottom: 2px solid #343a40; padding-bottom: 10px; margin-bottom: 20px; }")
+            html.append(".azienda { font-size: 13px; line-height: 1.4; }")
+            html.append(".doc-title { font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; }")
+            html.append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+            html.append("th { background: #343a40; color: white; padding: 8px; text-align: left; font-size: 12px; }")
+            html.append("td { padding: 6px 8px; border-bottom: 1px solid #ddd; font-size: 12px; }")
+            html.append("td.num, th.num { text-align: right; }")
+            html.append("td.center, th.center { text-align: center; }")
+            html.append(".totale-row td { font-weight: bold; border-top: 2px solid #343a40; }")
+            html.append(".firma { margin-top: 40px; font-size: 11px; color: #666; font-style: italic; }")
+            html.append(".badge { display: inline-block; padding: 3px 8px; background: #ffc107; color: #000; font-size: 11px; font-weight: bold; border-radius: 3px; }")
+            html.append("@media print { body { margin: 10mm; } .no-print { display: none; } }")
+            html.append("</style>")
+            html.append("</head>")
+            html.append("<body>")
+
+            html.append("<div class='header'>")
+            html.append(f"<h1>{esc(az.get('ragione_sociale', ''))}</h1>")
+            html.append("<div class='azienda'>")
+            indirizzo_parts = []
+            if az.get("indirizzo"):
+                indirizzo_parts.append(esc(az["indirizzo"]))
+            if az.get("civico"):
+                indirizzo_parts.append(esc(az["civico"]))
+            if indirizzo_parts:
+                html.append(", ".join(indirizzo_parts) + "<br>")
+            cap_loc = []
+            if az.get("cap"):
+                cap_loc.append(esc(az["cap"]))
+            if az.get("localita"):
+                cap_loc.append(esc(az["localita"]))
+            if cap_loc:
+                html.append(" ".join(cap_loc))
+                if az.get("provincia"):
+                    html.append(f" ({esc(az['provincia'])})")
+                html.append("<br>")
+            if az.get("partita_iva"):
+                html.append(f"P.IVA: {esc(az['partita_iva'])} ")
+            if az.get("codice_fiscale"):
+                html.append(f"C.F.: {esc(az['codice_fiscale'])}")
+            html.append("<br>")
+            if az.get("email"):
+                html.append(f"Email: {esc(az['email'])}<br>")
+            html.append("</div>")
+            html.append("</div>")
+
+            html.append(f"<div class='doc-title'>COPIA DI CORTESIA - "
+                        f"{esc(doc['tipo_documento'])} n. {esc(doc['numero'])}</div>")
+            html.append(f"<div>Data: {esc(doc['data_emissione'])}</div>")
+            html.append(f"<div>Pagamento: {esc(doc['pagamento'] or '-')}</div>")
+
+            html.append("<div class='doc-title' style='margin-top:15px;'>Destinatario</div>")
+            html.append(f"<div>{esc(doc['cliente_nome'])}</div>")
+            cli_parts = []
+            if doc["indirizzo"]:
+                s = esc(doc["indirizzo"])
+                if doc["civico"]:
+                    s += f", {esc(doc['civico'])}"
+                cli_parts.append(s)
+            if doc["cap"] or doc["localita"]:
+                s = ""
+                if doc["cap"]:
+                    s += esc(doc["cap"]) + " "
+                if doc["localita"]:
+                    s += esc(doc["localita"])
+                if doc["provincia"]:
+                    s += f" ({esc(doc['provincia'])})"
+                cli_parts.append(s)
+            if doc["codice_fiscale"]:
+                cli_parts.append(f"C.F.: {esc(doc['codice_fiscale'])}")
+            if doc["partita_iva"]:
+                cli_parts.append(f"P.IVA: {esc(doc['partita_iva'])}")
+            for p in cli_parts:
+                html.append(f"<div>{p}</div>")
+
+            html.append("<table>")
+            html.append("<thead><tr>")
+            html.append("<th>Descrizione</th>")
+            html.append("<th class='center'>Q.tà</th>")
+            html.append("<th class='num'>P. Unit.</th>")
+            html.append("<th class='center'>IVA</th>")
+            html.append("<th class='num'>Totale</th>")
+            html.append("</tr></thead>")
+            html.append("<tbody>")
+
+            if righe:
+                for r in righe:
+                    desc = esc(r["descrizione"])
+                    if r["sconto_riga"] and r["sconto_riga"] > 0:
+                        desc += f" <small>(sconto {r['sconto_riga']}{r['tipo_sconto_riga']})</small>"
+                    aliquota_disp = f"{r['aliquota_iva']:.0f}%" if r["aliquota_iva"] else "Esente"
+                    html.append("<tr>")
+                    html.append(f"<td>{desc}</td>")
+                    html.append(f"<td class='center'>{r['quantita']:.2f}</td>")
+                    html.append(f"<td class='num'>€ {r['prezzo_unitario']:.2f}</td>")
+                    html.append(f"<td class='center'>{aliquota_disp}</td>")
+                    html.append(f"<td class='num'>€ {r['totale_riga']:.2f}</td>")
+                    html.append("</tr>")
+            else:
+                html.append("<tr><td colspan='5' style='text-align:center;color:#999;'>"
+                            "Nessuna riga di dettaglio disponibile per questo documento."
+                            "</td></tr>")
+
+            html.append("</tbody>")
+            html.append("</table>")
+
+            html.append("<table style='margin-top:15px; width:50%; margin-left:auto;'>")
+            imponibile = doc["imponibile"] or 0.0
+            totale = doc["totale_documento"] or 0.0
+            iva_totale = max(0.0, totale - imponibile)
+            html.append(f"<tr><td>Imponibile</td><td class='num'>€ {imponibile:.2f}</td></tr>")
+            html.append(f"<tr><td>IVA</td><td class='num'>€ {iva_totale:.2f}</td></tr>")
+            html.append(f"<tr class='totale-row'><td>Totale</td><td class='num'>€ {totale:.2f}</td></tr>")
+            html.append("</table>")
+
+            html.append("<div style='margin-top:20px;'>")
+            html.append("<span class='badge'>COPIA DI CORTESIA</span>")
+            html.append("<span style='font-size:11px; margin-left:10px; color:#666;'>"
+                        "Documento non valido ai fini fiscali.</span>")
+            html.append("</div>")
+            html.append("<div class='firma'>"
+                        "Documento generato dal gestionale Mercurio - "
+                        f"{esc(datetime.now().strftime('%d/%m/%Y %H:%M'))}"
+                        "</div>")
+
+            html.append("<div class='no-print' style='margin-top:20px;'>")
+            html.append("<button onclick='window.print()' "
+                        "style='padding:10px 20px;font-size:14px;cursor:pointer;'>"
+                        "🖨️ Stampa / Salva come PDF</button>")
+            html.append("</div>")
+
+            html.append("</body>")
+            html.append("</html>")
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(html))
+
+            messagebox.showinfo(
+                "Esportazione Riuscita",
+                f"Copia di cortesia salvata in:\n{file_path}\n\n"
+                f"Apri il file nel browser e usa 'Stampa' per generare il PDF.",
+                parent=self)
+        except Exception as e:
+            log.exception("Errore esportazione copia di cortesia id=%s", doc_id)
+            messagebox.showerror("Errore",
+                                 f"Impossibile generare la copia di cortesia: {e}",
+                                 parent=self)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    def annulla_scontrino(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Attenzione",
+                                   "Seleziona uno scontrino da annullare.",
+                                   parent=self)
+            return
+
+        item_values = self.tree.item(selected[0], "values")
+        doc_id = item_values[0]
+        tipo = item_values[1]
+        numero = item_values[2]
+
+        if tipo != "SCONTRINO":
+            messagebox.showwarning(
+                "Attenzione",
+                "È possibile effettuare lo storno/annullo solo sui documenti di tipo SCONTRINO.",
+                parent=self)
+            return
+
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT stato_xml FROM documenti WHERE id = ?", (doc_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                messagebox.showerror("Errore", "Documento non trovato.", parent=self)
+                return
+
+            if row["stato_xml"] == "ANNULLATO_RT":
+                messagebox.showwarning(
+                    "Attenzione",
+                    f"Lo scontrino {numero} risulta già annullato. "
+                    f"Impossibile annullarlo una seconda volta.",
+                    parent=self)
+                return
+
+            if not messagebox.askyesno(
+                "Conferma Scontrino di Annullo",
+                f"Vuoi emettere uno Scontrino di Annullo (Storno RT) "
+                f"per il documento {numero}?",
+                parent=self,
+            ):
+                return
+
+            cursor.execute(
+                "UPDATE documenti SET stato_xml = 'ANNULLATO_RT' WHERE id = ?",
+                (doc_id,))
+            cursor.execute("""
+                INSERT INTO documenti
+                    (tipo_documento, numero, data_emissione,
+                     imponibile, totale_documento, stato_xml, pagamento,
+                     stato_documento)
+                SELECT 'ANNULLO', 'STNO-' || numero, datetime('now','localtime'),
+                       -imponibile, -totale_documento, 'TRASMESSO_RT', pagamento,
+                       'EMESSO'
+                FROM documenti WHERE id = ?
+            """, (doc_id,))
+
+            conn.commit()
+            self.carica_documenti()
+            messagebox.showinfo(
+                "Annullamento Effettuato",
+                "Comando di scontrino di annullo inviato con successo al "
+                "Registratore Telematico.",
+                parent=self)
+        except Exception as e:
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            log.exception("Errore annullo scontrino id=%s numero=%s",
+                          doc_id, numero)
+            messagebox.showerror("Errore",
+                                 f"Impossibile completare l'annullo: {e}",
+                                 parent=self)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass

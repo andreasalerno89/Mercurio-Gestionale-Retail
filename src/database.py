@@ -153,7 +153,7 @@ def init_db():
             )
         """)
 
-            # 5. Tabella Documenti Fiscali (Scontrini, Fatture, DDT, Annulli)
+        # 5. Tabella Documenti Fiscali (Scontrini, Fatture, DDT, Annulli)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documenti (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,6 +173,8 @@ def init_db():
                 tipo_soggetto TEXT DEFAULT 'OCCASIONALE',
                 motivo_annullo TEXT,
                 riferimento_esterno TEXT,
+                stato_documento TEXT DEFAULT 'EMESSO',
+                note TEXT,
                 FOREIGN KEY (cliente_id) REFERENCES clienti(id)
             )
         """)
@@ -257,7 +259,7 @@ def init_db():
         # MIGRAZIONI AUTOMATICHE PER DB ESISTENTI
         # ==========================================
 
-                       # --- documenti ---------------------------------------------------
+                              # --- documenti ---------------------------------------------------
         _safe_add_column(cursor, "documenti", "pagamento", "TEXT")
         _safe_add_column(cursor, "documenti", "metodo_pagamento", "TEXT")
         _safe_add_column(cursor, "documenti", "scontrino_origine_id", "INTEGER")
@@ -265,6 +267,8 @@ def init_db():
         _safe_add_column(cursor, "documenti", "tipo_soggetto", "TEXT DEFAULT 'OCCASIONALE'")
         _safe_add_column(cursor, "documenti", "motivo_annullo", "TEXT")
         _safe_add_column(cursor, "documenti", "riferimento_esterno", "TEXT")
+        _safe_add_column(cursor, "documenti", "stato_documento", "TEXT DEFAULT 'EMESSO'")
+        _safe_add_column(cursor, "documenti", "note", "TEXT")
 
         # --- documenti_righe ---------------------------------------------
         _safe_add_column(cursor, "documenti_righe", "sconto_riga", "REAL DEFAULT 0.0")
